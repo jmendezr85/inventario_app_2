@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useInventory } from '@/lib/hooks/use-inventory';
 import type { Location } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { Camera, Boxes, Warehouse, CheckCircle, HelpCircle } from 'lucide-react';
+import { Camera, Boxes, Warehouse, CheckCircle, HelpCircle, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ScannerDialog } from './scanner-dialog';
 
@@ -33,8 +33,10 @@ export function ScanView() {
 
     startTransition(() => {
       const newScan = scanItem(ean, location);
-      setHighlightedScanId(newScan.id);
-      setTimeout(() => setHighlightedScanId(null), 1000); // Highlight for 1 sec
+      if (newScan) {
+        setHighlightedScanId(newScan.id);
+        setTimeout(() => setHighlightedScanId(null), 1000); // Highlight for 1 sec
+      }
     });
     
     setManualEan(''); // Clear manual input after scan
@@ -117,7 +119,7 @@ export function ScanView() {
                         )}>
                             <CardContent className="p-3 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    {isKnown ? <CheckCircle className="h-5 w-5 text-green-600" /> : <HelpCircle className="h-5 w-5 text-yellow-600" />}
+                                    {isKnown ? <CheckCircle className="h-5 w-5 text-green-600" /> : <XCircle className="h-5 w-5 text-red-600" />}
                                     <div>
                                         <p className="font-bold">{scan.description}</p>
                                         <p className="text-sm text-muted-foreground">{scan.ean}</p>

@@ -25,7 +25,7 @@ interface InventoryContextType {
   selectStore: (storeId: string) => void;
   masterProducts: Product[];
   loadMasterProducts: (products: Product[]) => void;
-  scanItem: (ean: string, location: Location) => RecentScan;
+  scanItem: (ean: string, location: Location) => RecentScan | null;
   recentScans: RecentScan[];
   getReportData: () => { ean: string, description: string, bodega: number, mueble: number, total: number }[];
   updateInventoryItem: (ean: string, location: Location, quantity: number) => void;
@@ -104,9 +104,19 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   }, [inventories, activeStoreId, setInventories]);
 
   const scanItem = (ean: string, location: Location) => {
-    const inventory = getInventory();
     const product = masterProducts.find((p) => p.ean === ean);
-    const description = product ? product.description : 'Desconocido';
+    
+    if (!product) {
+      toast({
+        variant: 'destructive',
+        title: 'Producto Desconocido',
+        description: `El EAN "${ean}" no se encontró en la base de datos.`,
+      });
+      return null;
+    }
+    
+    const inventory = getInventory();
+    const description = product.description;
     
     const newInventory = { ...inventory };
     if (!newInventory[ean]) {

@@ -59,7 +59,6 @@ export function ScannerDialog({
 
       setTimeout(() => {
           setShowSuccessOverlay(false);
-          // Allow the scanner to start again after the cooldown
           isHandlingSuccessRef.current = false;
       }, 500); 
   }, [onScanSuccess]);
@@ -79,16 +78,15 @@ export function ScannerDialog({
     const scanner = html5QrcodeRef.current;
     
     let isMounted = true;
-    let localScanner: Html5Qrcode | null = scanner;
 
-    const startScanner = async (cameraId: string) => {
-      if (!localScanner || localScanner.isScanning || isHandlingSuccessRef.current) {
+    const startScannerWithCameraId = async (cameraId: string) => {
+      if (!scanner || scanner.isScanning) {
         return;
       }
       
       try {
         setErrorMessage(null);
-        await localScanner.start(
+        await scanner.start(
           cameraId,
           {
             fps: 10,
@@ -111,45 +109,42 @@ export function ScannerDialog({
         }
       }
     };
+    
+    const setupScanner = async () => {
+        try {
+            const devices = await Html5Qrcode.getCameras();
+            if (!isMounted) return;
 
-    if (cameras.length === 0) {
-      Html5Qrcode.getCameras()
-        .then((devices) => {
-          if (!isMounted) return;
-          if (devices && devices.length) {
-            setCameras(devices);
-            const backCamera = devices.find(d => d.label.toLowerCase().includes('back')) || devices[0];
-            if (!selectedCameraId) {
-                setSelectedCameraId(backCamera.id);
+            if (devices && devices.length) {
+                setCameras(devices);
+                if (!selectedCameraId) {
+                    const backCamera = devices.find(d => d.label.toLowerCase().includes('back')) || devices[0];
+                    setSelectedCameraId(backCamera.id);
+                }
+            } else {
+                setErrorMessage('No se encontraron cámaras en este dispositivo.');
             }
-          } else {
-            setErrorMessage('No se encontraron cámaras en este dispositivo.');
-          }
-        })
-        .catch((err) => {
-          if (!isMounted) return;
-          if (err.name === 'NotAllowedError') {
+        } catch (err: any) {
+            if (!isMounted) return;
+            if (err.name === 'NotAllowedError') {
               setErrorMessage('Permiso de cámara denegado. Por favor, habilítalo en los ajustes de tu navegador.');
-          } else {
+            } else {
                setErrorMessage(`No se pudo acceder a las cámaras: ${err.message}`);
-          }
-        });
-    }
+            }
+        }
+    };
 
     if (selectedCameraId) {
-      // Stop previous scanner instance before starting new one
-      if (localScanner.isScanning) {
-          stopScanner().then(() => startScanner(selectedCameraId));
-      } else {
-          startScanner(selectedCameraId);
-      }
+        stopScanner().then(() => startScannerWithCameraId(selectedCameraId));
+    } else {
+        setupScanner();
     }
 
     return () => {
       isMounted = false;
       stopScanner();
     };
-  }, [open, selectedCameraId, cameras.length, stopScanner, handleScanSuccess]);
+  }, [open, selectedCameraId, stopScanner, handleScanSuccess]);
 
 
   return (

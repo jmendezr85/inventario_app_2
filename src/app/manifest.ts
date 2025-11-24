@@ -2,9 +2,9 @@ import { type MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'StockFlow',
-    short_name: 'StockFlow',
-    description: 'Inventory management and barcode scanning app.',
+    name: 'Inventario',
+    short_name: 'Inventario',
+    description: 'Inventario para Productos',
     start_url: '/',
     display: 'standalone',
     background_color: '#E6EEFF',

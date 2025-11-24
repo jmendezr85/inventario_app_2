@@ -51,12 +51,14 @@ export function ScannerDialog({
   }, []);
 
   const handleScanSuccess = useCallback((decodedText: string) => {
+      // Prevent multiple rapid scans of the same code
       if (isHandlingSuccessRef.current) return;
 
       isHandlingSuccessRef.current = true;
       onScanSuccess(decodedText);
       setShowSuccessOverlay(true);
 
+      // Reset overlay and allow new scans after a short delay
       setTimeout(() => {
           setShowSuccessOverlay(false);
           isHandlingSuccessRef.current = false;
@@ -73,7 +75,8 @@ export function ScannerDialog({
     if (!container) return;
 
     if (!html5QrcodeRef.current) {
-        html5QrcodeRef.current = new Html5Qrcode(qrcodeRegionId, { verbose: false });
+        // Correct initialization with verbose as a boolean, not an object
+        html5QrcodeRef.current = new Html5Qrcode(qrcodeRegionId, false);
     }
     const scanner = html5QrcodeRef.current;
     
@@ -89,8 +92,9 @@ export function ScannerDialog({
         await scanner.start(
           cameraId,
           {
-            fps: 10,
+            fps: 10, // Fluid FPS for scanning
             qrbox: (viewfinderWidth, viewfinderHeight) => {
+                // Creates a square scanning box that's 85% of the smaller viewport dimension
                 const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
                 const qrboxSize = Math.floor(minEdge * 0.85);
                 return { width: qrboxSize, height: qrboxSize };
@@ -98,7 +102,7 @@ export function ScannerDialog({
             aspectRatio: 1.0,
           },
           handleScanSuccess,
-          (error) => { /* Verbose scan errors, ignored */ }
+          (error) => { /* Verbose scan errors, ignored for better UX */ }
         );
       } catch (err: any) {
         if (!isMounted) return;
@@ -119,6 +123,7 @@ export function ScannerDialog({
                 setCameras(devices);
                 const currentCameraId = selectedCameraId;
                 if (!currentCameraId) {
+                    // Prefer back camera by default
                     const backCamera = devices.find(d => d.label.toLowerCase().includes('back')) || devices[0];
                     setSelectedCameraId(backCamera.id);
                     await startScannerWithCameraId(backCamera.id);
@@ -158,19 +163,23 @@ export function ScannerDialog({
         <div className="relative w-full flex-1">
           <div id={qrcodeRegionId} className="w-full h-full" />
           
+          {/* Visual scanner overlay */}
           <div className="absolute inset-0 pointer-events-none">
               <div className="w-full h-full flex items-center justify-center">
                   <div className="w-[80vw] max-w-[400px] aspect-square relative">
+                      {/* Corner borders */}
                       <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-primary rounded-tl-xl transition-all duration-300"></div>
                       <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-primary rounded-tr-xl transition-all duration-300"></div>
                       <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-primary rounded-bl-xl transition-all duration-300"></div>
                       <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-primary rounded-br-xl transition-all duration-300"></div>
 
+                      {/* Animated scanning line */}
                       <div className="absolute top-1/2 left-0 w-full h-0.5 bg-red-500/70 shadow-[0_0_10px_0_rgba(255,0,0,0.7)] animate-scan-line"></div>
                   </div>
               </div>
           </div>
           
+          {/* Success overlay */}
           <div className={cn(
               "absolute inset-0 flex items-center justify-center bg-green-500/20 transition-opacity duration-300 pointer-events-none",
               showSuccessOverlay ? "opacity-100" : "opacity-0"
@@ -231,3 +240,5 @@ export function ScannerDialog({
     </Dialog>
   );
 }
+
+    

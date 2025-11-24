@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { ExcelUploader } from '@/components/import/excel-uploader';
 import {
   Card,
@@ -20,13 +20,18 @@ export default function ImportPage() {
   const [newEan, setNewEan] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const { toast } = useToast();
+  const eanInputRef = useRef<HTMLInputElement>(null);
+
 
   const handleAddProduct = (e: React.FormEvent) => {
     e.preventDefault();
     if (newEan.trim() && newDescription.trim()) {
-        addProduct({ ean: newEan.trim(), description: newDescription.trim() });
-        setNewEan('');
-        setNewDescription('');
+        const success = addProduct({ ean: newEan.trim(), description: newDescription.trim() });
+        if (success) {
+            setNewEan('');
+            setNewDescription('');
+            eanInputRef.current?.focus();
+        }
     } else {
         toast({
             variant: 'destructive',
@@ -37,8 +42,8 @@ export default function ImportPage() {
   };
 
   return (
-    <div className="p-4 space-y-4">
-      <Card>
+    <div className="p-4 md:p-6 lg:p-8 space-y-6">
+      <Card className="w-full max-w-lg mx-auto">
         <CardHeader>
           <CardTitle>Crear Producto Manualmente</CardTitle>
           <CardDescription>
@@ -51,6 +56,7 @@ export default function ImportPage() {
                 <label htmlFor="ean">Código EAN</label>
                 <Input 
                     id="ean"
+                    ref={eanInputRef}
                     placeholder="Ingresa el código de barras"
                     value={newEan}
                     onChange={(e) => setNewEan(e.target.value)}
@@ -73,7 +79,7 @@ export default function ImportPage() {
         </CardContent>
       </Card>
       
-      <Card>
+      <Card className="w-full max-w-lg mx-auto">
         <CardHeader>
           <CardTitle>Importar Productos desde Excel</CardTitle>
           <CardDescription>

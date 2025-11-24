@@ -31,7 +31,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FileDown, Trash2, Pencil, Search, X } from 'lucide-react';
+import { FileDown, Trash2, Pencil, Search, X, Warehouse, Boxes, Package } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../ui/card';
 
@@ -46,6 +46,18 @@ export function ReportView() {
     if (!activeStore) return [];
     return getReportData();
   }, [activeStore, getReportData]);
+  
+  const totals = useMemo(() => {
+    return reportData.reduce(
+        (acc, item) => {
+            acc.bodega += item.bodega;
+            acc.mueble += item.mueble;
+            acc.total += item.total;
+            return acc;
+        },
+        { bodega: 0, mueble: 0, total: 0 }
+    );
+  }, [reportData]);
 
   const filteredData = useMemo(() => {
     return reportData.filter(
@@ -97,6 +109,39 @@ export function ReportView() {
 
   return (
     <div className="p-4 space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Bodega</CardTitle>
+                  <Warehouse className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                  <div className="text-2xl font-bold">{totals.bodega}</div>
+                  <p className="text-xs text-muted-foreground">unidades</p>
+              </CardContent>
+          </Card>
+          <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Mueble</CardTitle>
+                  <Boxes className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                  <div className="text-2xl font-bold">{totals.mueble}</div>
+                   <p className="text-xs text-muted-foreground">unidades</p>
+              </CardContent>
+          </Card>
+          <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total General</CardTitle>
+                  <Package className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                  <div className="text-2xl font-bold">{totals.total}</div>
+                   <p className="text-xs text-muted-foreground">unidades</p>
+              </CardContent>
+          </Card>
+      </div>
+
       <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -176,7 +221,7 @@ export function ReportView() {
 
       {/* Desktop View */}
       <Card className="hidden md:block">
-        <ScrollArea className="h-[calc(100vh-20rem)]">
+        <ScrollArea className="h-[calc(100vh-25rem)]">
           <Table>
             <TableHeader className="sticky top-0 bg-background">
               <TableRow>
@@ -264,5 +309,3 @@ export function ReportView() {
     </div>
   );
 }
-
-    

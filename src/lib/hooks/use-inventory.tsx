@@ -26,7 +26,7 @@ interface InventoryContextType {
   deleteStore: (storeId: string) => void;
   masterProducts: Product[];
   loadMasterProducts: (products: Product[]) => void;
-  addProduct: (product: Product) => void;
+  addProduct: (product: Product) => boolean;
   scanItem: (ean: string, location: Location) => RecentScan | null;
   recentScans: RecentScan[];
   clearRecentScans: () => void;
@@ -105,7 +105,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     setMasterProducts(products);
   };
 
-  const addProduct = (product: Product) => {
+  const addProduct = (product: Product): boolean => {
     // Check if product with same EAN already exists
     if (masterProducts.some(p => p.ean === product.ean)) {
         toast({
@@ -113,13 +113,14 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
             title: 'Error',
             description: 'Ya existe un producto con este código EAN.',
         });
-        return;
+        return false;
     }
     setMasterProducts([...masterProducts, product]);
     toast({
         title: 'Producto Agregado',
         description: `El producto "${product.description}" ha sido agregado.`,
     });
+    return true;
   };
   
   const getInventory = useCallback(() => {

@@ -35,93 +35,92 @@ export function ScannerDialog({
   const html5QrcodeRef = useRef<Html5Qrcode | null>(null);
   const [cameras, setCameras] = useState<CameraDevice[]>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string | undefined>();
-  const [isScanning, setIsScanning] = useState(false);
-  const [isStopping, setIsStopping] = useState(false);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
-  const successTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Ref to prevent multiple success triggers for a single scan
   const isHandlingSuccessRef = useRef(false);
 
-
+  // Stop scanner function
   const stopScanner = useCallback(async () => {
-    if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning && !isStopping) {
-      setIsStopping(true);
+    if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning) {
       try {
         await html5QrcodeRef.current.stop();
       } catch (err) {
-        console.error("Failed to stop scanner cleanly", err);
-      } finally {
-        setIsScanning(false);
-        setIsStopping(false);
+        // This can fail if the scanner is already stopped or in a weird state.
+        // We can ignore it as our goal is to ensure it's stopped.
+        console.error("Scanner stop failed, but proceeding.", err);
       }
     }
-  }, [isStopping]);
+  }, []);
 
-
+  // Handle successful scan
   const handleScanSuccess = useCallback((decodedText: string) => {
-    if (isHandlingSuccessRef.current) return;
+      // Prevent multiple calls for the same scan
+      if (isHandlingSuccessRef.current) return;
 
-    isHandlingSuccessRef.current = true;
-    onScanSuccess(decodedText);
-    setShowSuccessOverlay(true);
-    
-    if(successTimeoutRef.current) {
-      clearTimeout(successTimeoutRef.current);
-    }
-    
-    successTimeoutRef.current = setTimeout(() => {
-      setShowSuccessOverlay(false);
-      isHandlingSuccessRef.current = false;
-    }, 500);
+      isHandlingSuccessRef.current = true;
+      onScanSuccess(decodedText);
+      setShowSuccessOverlay(true);
 
+      setTimeout(() => {
+          setShowSuccessOverlay(false);
+          isHandlingSuccessRef.current = false;
+      }, 500); // Cooldown period to prevent instant re-scans
   }, [onScanSuccess]);
 
 
-  const startScanner = useCallback(async (cameraId: string) => {
-    if (!open || isScanning || !document.getElementById(qrcodeRegionId)) return;
-    
+  // Effect to initialize and manage the scanner lifecycle
+  useEffect(() => {
+    if (!open) {
+      stopScanner();
+      return;
+    }
+
+    // Ensure the container element exists
+    const container = document.getElementById(qrcodeRegionId);
+    if (!container) return;
+
+    // Initialize scanner instance if it doesn't exist
     if (!html5QrcodeRef.current) {
         html5QrcodeRef.current = new Html5Qrcode(qrcodeRegionId, false);
     }
-    
     const scanner = html5QrcodeRef.current;
-    if (scanner.isScanning) {
-        return;
-    }
     
-    try {
-      setIsScanning(true);
-      setErrorMessage(null);
-      await scanner.start(
-        cameraId,
-        {
-          fps: 10,
-          qrbox: (viewfinderWidth, viewfinderHeight) => {
-             const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-             const qrboxSize = Math.floor(minEdge * 0.8);
-             return { width: qrboxSize, height: qrboxSize };
-          },
-          aspectRatio: 1.0,
-        },
-        handleScanSuccess,
-        (error) => {
-          // Do nothing on scan error, it's verbose
+    let didStart = false;
+
+    const start = async () => {
+        if (!selectedCameraId || (scanner.isScanning && didStart)) return;
+
+        await stopScanner(); // Ensure any previous session is stopped
+
+        try {
+            setErrorMessage(null);
+            await scanner.start(
+                selectedCameraId,
+                {
+                    fps: 10,
+                    qrbox: (viewfinderWidth, viewfinderHeight) => {
+                        const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                        const qrboxSize = Math.floor(minEdge * 0.8);
+                        return { width: qrboxSize, height: qrboxSize };
+                    },
+                    aspectRatio: 1.0,
+                },
+                handleScanSuccess,
+                (error) => { /* Scan errors are verbose, ignore them */ }
+            );
+            didStart = true;
+        } catch (err: any) {
+            if (err.name === 'NotAllowedError') {
+                setErrorMessage('Permiso de cámara denegado. Por favor, habilítalo en los ajustes de tu navegador.');
+            } else {
+                console.error("Scanner start error:", err);
+            }
         }
-      );
-    } catch (err: any) {
-        setIsScanning(false);
-        if (err.name === 'NotAllowedError') {
-            setErrorMessage('Permiso de cámara denegado. Por favor, habilítalo en los ajustes de tu navegador.')
-        } else {
-            // Don't show generic error which might be confusing
-            console.error("Scanner start error:", err);
-            // setErrorMessage(`Error al iniciar escáner: ${err.message || 'Error desconocido.'}`);
-        }
-    }
-  }, [open, isScanning, handleScanSuccess]);
-  
-  useEffect(() => {
-    if (open) {
-      Html5Qrcode.getCameras()
+    };
+
+    if (!cameras.length) {
+        Html5Qrcode.getCameras()
         .then((devices) => {
           if (devices && devices.length) {
             setCameras(devices);
@@ -141,38 +140,17 @@ export function ScannerDialog({
             }
         });
     } else {
-       stopScanner();
+        start();
     }
-  }, [open, selectedCameraId]);
 
-  useEffect(() => {
-    // Cleanup on unmount
+    // Cleanup on effect change or unmount
     return () => {
-        if (successTimeoutRef.current) {
-            clearTimeout(successTimeoutRef.current);
-        }
+      if (didStart) {
         stopScanner();
-    }
-  }, [stopScanner]);
+      }
+    };
+  }, [open, selectedCameraId, cameras, stopScanner, handleScanSuccess]);
 
-  useEffect(() => {
-    if (open && selectedCameraId) {
-        const scanner = html5QrcodeRef.current;
-        if (scanner && scanner.isScanning) {
-            stopScanner().then(() => {
-                // Give the DOM a moment to settle before restarting
-                setTimeout(() => startScanner(selectedCameraId), 50);
-            });
-        } else {
-            startScanner(selectedCameraId);
-        }
-    }
-  }, [open, selectedCameraId, startScanner, stopScanner]);
-
-
-  const handleClose = () => {
-    onOpenChange(false);
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -189,7 +167,7 @@ export function ScannerDialog({
                       <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-primary rounded-bl-xl"></div>
                       <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-primary rounded-br-xl"></div>
 
-                      {isScanning && <div className="absolute top-1/2 left-0 w-full h-0.5 bg-red-500 animate-scan-line"></div>}
+                      <div className="absolute top-1/2 left-0 w-full h-0.5 bg-red-500 animate-scan-line"></div>
                   </div>
               </div>
           </div>
@@ -204,7 +182,7 @@ export function ScannerDialog({
 
 
           <Button
-            onClick={handleClose}
+            onClick={() => onOpenChange(false)}
             variant="ghost"
             size="icon"
             className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white hover:text-white rounded-full z-20"
@@ -223,7 +201,7 @@ export function ScannerDialog({
                 </Alert>
             )}
              {cameras.length > 1 && (
-                <Select value={selectedCameraId} onValueChange={setSelectedCameraId} disabled={isScanning && !isStopping}>
+                <Select value={selectedCameraId} onValueChange={setSelectedCameraId}>
                     <SelectTrigger className="w-full">
                         <SelectValue placeholder="Seleccionar cámara" />
                     </SelectTrigger>

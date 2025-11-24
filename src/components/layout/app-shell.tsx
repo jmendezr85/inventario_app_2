@@ -26,6 +26,7 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
   }, []);
   
   useEffect(() => {
+    // Only set the color on the client-side after hydration
     if (hydrated) {
         setHeaderColor(activeStore?.color || 'bg-primary');
     }

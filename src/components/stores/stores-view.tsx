@@ -36,12 +36,12 @@ export function StoresView() {
   const handleAddStore = (e: React.FormEvent) => {
     e.preventDefault();
     if (newStoreName.trim()) {
-      addStore({ id: Date.now().toString(), name: newStoreName.trim() });
-      setNewStoreName('');
+      addStore(newStoreName.trim());
       toast({
         title: 'Almacén agregado',
         description: `Se creó el almacén "${newStoreName.trim()}".`,
       });
+      setNewStoreName('');
     }
   };
 
@@ -108,7 +108,11 @@ export function StoresView() {
                         : 'hover:bg-accent/50'
                     )}
                   >
-                    <span className="font-medium">{store.name}</span>
+                    <div className="flex items-center gap-3">
+                      <div className={cn("h-4 w-4 rounded-full", store.color)}></div>
+                      <span className="font-medium">{store.name}</span>
+                    </div>
+
                     <div className="flex items-center">
                       {activeStore?.id === store.id && (
                         <Check className="h-5 w-5 mr-2" />

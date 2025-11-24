@@ -1,6 +1,7 @@
 export interface Store {
   id: string;
   name: string;
+  color: string;
 }
 
 export interface Product {

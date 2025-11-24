@@ -21,7 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 interface InventoryContextType {
   stores: Store[];
   activeStore: Store | null;
-  addStore: (store: Store) => void;
+  addStore: (storeName: string) => void;
   selectStore: (storeId: string) => void;
   deleteStore: (storeId: string) => void;
   masterProducts: Product[];
@@ -67,6 +67,10 @@ const useLocalStorage = <T,>(key: string, initialValue: T): [T, (value: T) => vo
   return [storedValue, setValue];
 };
 
+const STORE_COLORS = [
+  'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500', 'bg-pink-500', 'bg-orange-500', 'bg-teal-500'
+];
+
 export function InventoryProvider({ children }: { children: ReactNode }) {
   const [stores, setStores] = useLocalStorage<Store[]>('stores', []);
   const [activeStoreId, setActiveStoreId] = useLocalStorage<string | null>('activeStoreId', null);
@@ -77,10 +81,15 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
   const activeStore = stores.find((s) => s.id === activeStoreId) || null;
   
-  const addStore = (store: Store) => {
-    setStores([...stores, store]);
+  const addStore = (storeName: string) => {
+    const newStore: Store = {
+        id: Date.now().toString(),
+        name: storeName,
+        color: STORE_COLORS[stores.length % STORE_COLORS.length] || 'bg-gray-500',
+    };
+    setStores([...stores, newStore]);
     if (!activeStoreId) {
-      setActiveStoreId(store.id);
+      setActiveStoreId(newStore.id);
     }
   };
 

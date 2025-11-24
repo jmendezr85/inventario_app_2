@@ -80,7 +80,7 @@ export function ScannerDialog({
     let isMounted = true;
 
     const startScannerWithCameraId = async (cameraId: string) => {
-      if (!scanner || scanner.isScanning) {
+      if (!isMounted || !scanner || scanner.isScanning) {
         return;
       }
       
@@ -117,9 +117,13 @@ export function ScannerDialog({
 
             if (devices && devices.length) {
                 setCameras(devices);
-                if (!selectedCameraId) {
+                const currentCameraId = selectedCameraId;
+                if (!currentCameraId) {
                     const backCamera = devices.find(d => d.label.toLowerCase().includes('back')) || devices[0];
                     setSelectedCameraId(backCamera.id);
+                    await startScannerWithCameraId(backCamera.id);
+                } else {
+                    await startScannerWithCameraId(currentCameraId);
                 }
             } else {
                 setErrorMessage('No se encontraron cámaras en este dispositivo.');
@@ -134,8 +138,8 @@ export function ScannerDialog({
         }
     };
 
-    if (selectedCameraId) {
-        stopScanner().then(() => startScannerWithCameraId(selectedCameraId));
+    if (scanner && scanner.isScanning) {
+        stopScanner().then(setupScanner);
     } else {
         setupScanner();
     }

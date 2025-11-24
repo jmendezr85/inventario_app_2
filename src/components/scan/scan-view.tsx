@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useTransition, useCallback } from 'react';
+import { useState, useTransition, useCallback, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { useInventory } from '@/lib/hooks/use-inventory';
 import type { Location } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { Camera, Boxes, Warehouse, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Camera, Boxes, Warehouse, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ScannerDialog } from './scanner-dialog';
 
@@ -19,15 +19,25 @@ export function ScanView() {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
   const [highlightedScanId, setHighlightedScanId] = useState<string | null>(null);
+  const isHandlingScanRef = useRef(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   const handleScan = useCallback((ean: string) => {
-    if (!ean) return;
+    if (!ean || isHandlingScanRef.current) return;
+    
+    isHandlingScanRef.current = true;
+
     if (!activeStore) {
       toast({
         variant: 'destructive',
         title: 'Error',
         description: 'Por favor, selecciona un almacén primero.',
       });
+      isHandlingScanRef.current = false;
       return;
     }
     
@@ -39,6 +49,7 @@ export function ScanView() {
         title: 'Producto Desconocido',
         description: `El EAN "${ean}" no se encontró en la base de datos.`,
       });
+      setTimeout(() => { isHandlingScanRef.current = false; }, 500);
       return;
     }
 
@@ -46,17 +57,27 @@ export function ScanView() {
       const newScan = scanItem(ean, location);
       if (newScan) {
         setHighlightedScanId(newScan.id);
-        setTimeout(() => setHighlightedScanId(null), 1000); // Highlight for 1 sec
+        const timer = setTimeout(() => setHighlightedScanId(null), 1000);
+        return () => clearTimeout(timer);
       }
     });
     
     setManualEan(''); // Clear manual input after scan
+    setTimeout(() => { isHandlingScanRef.current = false; }, 500);
   }, [activeStore, location, scanItem, toast, masterProducts]);
   
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     handleScan(manualEan);
   };
+
+  if (!hydrated) {
+    return (
+        <div className="flex h-full items-center justify-center p-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+    );
+  }
 
   if (!activeStore) {
     return (

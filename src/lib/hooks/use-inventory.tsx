@@ -26,8 +26,10 @@ interface InventoryContextType {
   deleteStore: (storeId: string) => void;
   masterProducts: Product[];
   loadMasterProducts: (products: Product[]) => void;
+  addProduct: (product: Product) => void;
   scanItem: (ean: string, location: Location) => RecentScan | null;
   recentScans: RecentScan[];
+  clearRecentScans: () => void;
   getReportData: () => { ean: string, description: string, bodega: number, mueble: number, total: number }[];
   updateInventoryItem: (ean: string, location: Location, quantity: number) => void;
   deleteInventoryItem: (ean: string) => void;
@@ -88,15 +90,12 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteStore = (storeId: string) => {
-    // If the active store is the one being deleted, reset it.
     if (activeStoreId === storeId) {
       setActiveStoreId(null);
     }
     
-    // Remove the store
     setStores(stores.filter(s => s.id !== storeId));
 
-    // Remove the inventory for that store
     const newInventories = { ...inventories };
     delete newInventories[storeId];
     setInventories(newInventories);
@@ -104,6 +103,23 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
   const loadMasterProducts = (products: Product[]) => {
     setMasterProducts(products);
+  };
+
+  const addProduct = (product: Product) => {
+    // Check if product with same EAN already exists
+    if (masterProducts.some(p => p.ean === product.ean)) {
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Ya existe un producto con este código EAN.',
+        });
+        return;
+    }
+    setMasterProducts([...masterProducts, product]);
+    toast({
+        title: 'Producto Agregado',
+        description: `El producto "${product.description}" ha sido agregado.`,
+    });
   };
   
   const getInventory = useCallback(() => {
@@ -159,6 +175,14 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
     return newScan;
   };
+
+  const clearRecentScans = () => {
+    setRecentScans([]);
+    toast({
+        title: 'Historial borrado',
+        description: 'Se han eliminado los escaneos recientes.',
+    });
+  };
   
   const updateInventoryItem = (ean: string, location: Location, quantity: number) => {
     const inventory = getInventory();
@@ -198,8 +222,10 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     deleteStore,
     masterProducts,
     loadMasterProducts,
+    addProduct,
     scanItem,
     recentScans,
+    clearRecentScans,
     getReportData,
     updateInventoryItem,
     deleteInventoryItem,

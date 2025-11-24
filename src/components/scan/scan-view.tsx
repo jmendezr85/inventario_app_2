@@ -7,12 +7,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useInventory } from '@/lib/hooks/use-inventory';
 import type { Location } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { Camera, Boxes, Warehouse, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Camera, Boxes, Warehouse, CheckCircle, AlertCircle, Loader2, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ScannerDialog } from './scanner-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
 
 export function ScanView() {
-  const { activeStore, scanItem, recentScans, masterProducts } = useInventory();
+  const { activeStore, scanItem, recentScans, masterProducts, clearRecentScans } = useInventory();
   const [location, setLocation] = useState<Location>('Mueble');
   const [manualEan, setManualEan] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -136,7 +137,32 @@ export function ScanView() {
       <ScannerDialog open={scannerOpen} onOpenChange={setScannerOpen} onScanSuccess={handleScan} />
 
       <div>
-        <h3 className="text-lg font-semibold mb-2">Últimos Escaneos</h3>
+        <div className="flex justify-between items-center mb-2">
+            <h3 className="text-lg font-semibold">Últimos Escaneos</h3>
+            {recentScans.length > 0 && (
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="text-muted-foreground">
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>¿Borrar historial?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Esta acción eliminará la lista de escaneos recientes. No afectará el inventario.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={clearRecentScans}>
+                                Borrar
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            )}
+        </div>
         <div className="space-y-2">
             {recentScans.length === 0 ? (
                 <p className="text-muted-foreground text-center py-4">No hay escaneos recientes.</p>

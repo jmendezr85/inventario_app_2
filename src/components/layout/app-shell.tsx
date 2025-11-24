@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { InventoryProvider, useInventory } from '@/lib/hooks/use-inventory';
 import { BottomNav } from './bottom-nav';
 import { Logo } from '../icons/logo';
@@ -18,8 +18,19 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { activeStore } = useInventory();
   const title = pageTitles[pathname] ?? 'StockFlow';
+  const [headerColorClass, setHeaderColorClass] = useState('bg-primary');
+  const [hydrated, setHydrated] = useState(false);
 
-  const headerColorClass = activeStore?.color ? activeStore.color : 'bg-primary';
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (hydrated) {
+      setHeaderColorClass(activeStore?.color ? activeStore.color : 'bg-primary');
+    }
+  }, [activeStore, hydrated]);
+
 
   return (
     <div className="flex h-screen flex-col">

@@ -18,17 +18,16 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { activeStore } = useInventory();
   const title = pageTitles[pathname] ?? 'StockFlow';
-  const [headerColorClass, setHeaderColorClass] = useState('bg-primary');
+  const [headerColor, setHeaderColor] = useState('bg-primary');
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     setHydrated(true);
   }, []);
-
+  
   useEffect(() => {
-    // Only apply color changes on the client side after hydration
     if (hydrated) {
-      setHeaderColorClass(activeStore?.color ? activeStore.color : 'bg-primary');
+        setHeaderColor(activeStore?.color || 'bg-primary');
     }
   }, [activeStore, hydrated]);
 
@@ -37,7 +36,7 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen flex-col">
       <header className={cn(
         "flex h-16 items-center justify-between border-b px-4 text-primary-foreground shadow-md transition-colors",
-        headerColorClass
+        hydrated ? headerColor : 'bg-primary'
       )}>
         <div className="flex items-center gap-2">
           <Logo className="h-8 w-8 text-primary-foreground" />

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useInventory } from '@/lib/hooks/use-inventory';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { Check, Plus, Trash2 } from 'lucide-react';
+import { Check, Plus, Trash2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export function StoresView() {
@@ -32,6 +32,11 @@ export function StoresView() {
     useInventory();
   const [newStoreName, setNewStoreName] = useState('');
   const { toast } = useToast();
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   const handleAddStore = (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,75 +96,81 @@ export function StoresView() {
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-64">
-            <div className="space-y-2">
-              {stores.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">
-                  No has creado ningún almacén.
-                </p>
+             {!hydrated ? (
+                <div className="flex h-full items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
               ) : (
-                stores.map((store) => (
-                  <div
-                    key={store.id}
-                    onClick={() => selectStore(store.id)}
-                    className={cn(
-                      'w-full text-left p-3 rounded-lg border flex justify-between items-center transition-colors cursor-pointer',
-                      activeStore?.id === store.id
-                        ? 'bg-primary/10 border-primary text-primary'
-                        : 'hover:bg-accent/50'
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={cn("h-4 w-4 rounded-full", store.color)}></div>
-                      <span className="font-medium">{store.name}</span>
-                    </div>
+                <div className="space-y-2">
+                  {stores.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-4">
+                      No has creado ningún almacén.
+                    </p>
+                  ) : (
+                    stores.map((store) => (
+                      <div
+                        key={store.id}
+                        onClick={() => selectStore(store.id)}
+                        className={cn(
+                          'w-full text-left p-3 rounded-lg border flex justify-between items-center transition-colors cursor-pointer',
+                          activeStore?.id === store.id
+                            ? 'bg-primary/10 border-primary text-primary'
+                            : 'hover:bg-accent/50'
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={cn("h-4 w-4 rounded-full", store.color)}></div>
+                          <span className="font-medium">{store.name}</span>
+                        </div>
 
-                    <div className="flex items-center">
-                      {activeStore?.id === store.id && (
-                        <Check className="h-5 w-5 mr-2" />
-                      )}
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => e.stopPropagation()}
-                            className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>
-                              ¿Eliminar almacén?
-                            </AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta acción es permanente y eliminará el almacén "
-                              {store.name}" junto con todo su inventario
-                              asociado. ¿Estás seguro?
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              Cancelar
-                            </AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={(e) =>
-                                handleDeleteStore(e, store.id, store.name)
-                              }
-                            >
-                              Eliminar
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+                        <div className="flex items-center">
+                          {activeStore?.id === store.id && (
+                            <Check className="h-5 w-5 mr-2" />
+                          )}
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => e.stopPropagation()}
+                                className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  ¿Eliminar almacén?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Esta acción es permanente y eliminará el almacén "
+                                  {store.name}" junto con todo su inventario
+                                  asociado. ¿Estás seguro?
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  Cancelar
+                                </AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={(e) =>
+                                    handleDeleteStore(e, store.id, store.name)
+                                  }
+                                >
+                                  Eliminar
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+            )}
           </ScrollArea>
         </CardContent>
       </Card>

@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useInventory } from '@/lib/hooks/use-inventory';
 import type { Location } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { Camera, Boxes, Warehouse, CheckCircle, HelpCircle, XCircle } from 'lucide-react';
+import { Camera, Boxes, Warehouse, CheckCircle, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ScannerDialog } from './scanner-dialog';
 

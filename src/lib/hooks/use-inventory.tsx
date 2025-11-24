@@ -23,6 +23,7 @@ interface InventoryContextType {
   activeStore: Store | null;
   addStore: (store: Store) => void;
   selectStore: (storeId: string) => void;
+  deleteStore: (storeId: string) => void;
   masterProducts: Product[];
   loadMasterProducts: (products: Product[]) => void;
   scanItem: (ean: string, location: Location) => RecentScan | null;
@@ -84,6 +85,21 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   const selectStore = (storeId: string) => {
     setActiveStoreId(storeId);
     setRecentScans([]); // Clear recent scans when changing store
+  };
+
+  const deleteStore = (storeId: string) => {
+    // If the active store is the one being deleted, reset it.
+    if (activeStoreId === storeId) {
+      setActiveStoreId(null);
+    }
+    
+    // Remove the store
+    setStores(stores.filter(s => s.id !== storeId));
+
+    // Remove the inventory for that store
+    const newInventories = { ...inventories };
+    delete newInventories[storeId];
+    setInventories(newInventories);
   };
 
   const loadMasterProducts = (products: Product[]) => {
@@ -179,6 +195,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     activeStore,
     addStore,
     selectStore,
+    deleteStore,
     masterProducts,
     loadMasterProducts,
     scanItem,

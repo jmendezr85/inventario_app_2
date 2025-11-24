@@ -5,6 +5,17 @@ import { useInventory } from '@/lib/hooks/use-inventory';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
   Card,
   CardContent,
   CardDescription,
@@ -13,11 +24,12 @@ import {
 } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { Check, Plus } from 'lucide-react';
+import { Check, Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export function StoresView() {
-  const { stores, addStore, selectStore, activeStore } = useInventory();
+  const { stores, addStore, selectStore, activeStore, deleteStore } =
+    useInventory();
   const [newStoreName, setNewStoreName] = useState('');
   const { toast } = useToast();
 
@@ -31,6 +43,20 @@ export function StoresView() {
         description: `Se creó el almacén "${newStoreName.trim()}".`,
       });
     }
+  };
+
+  const handleDeleteStore = (
+    e: React.MouseEvent,
+    storeId: string,
+    storeName: string
+  ) => {
+    e.stopPropagation(); // Prevent store selection when clicking delete
+    deleteStore(storeId);
+    toast({
+      variant: 'destructive',
+      title: 'Almacén eliminado',
+      description: `Se eliminó el almacén "${storeName}".`,
+    });
   };
 
   return (
@@ -72,21 +98,61 @@ export function StoresView() {
                 </p>
               ) : (
                 stores.map((store) => (
-                  <button
+                  <div
                     key={store.id}
                     onClick={() => selectStore(store.id)}
                     className={cn(
-                      'w-full text-left p-3 rounded-lg border flex justify-between items-center transition-colors',
+                      'w-full text-left p-3 rounded-lg border flex justify-between items-center transition-colors cursor-pointer',
                       activeStore?.id === store.id
                         ? 'bg-primary/10 border-primary text-primary'
                         : 'hover:bg-accent/50'
                     )}
                   >
                     <span className="font-medium">{store.name}</span>
-                    {activeStore?.id === store.id && (
-                      <Check className="h-5 w-5" />
-                    )}
-                  </button>
+                    <div className="flex items-center">
+                      {activeStore?.id === store.id && (
+                        <Check className="h-5 w-5 mr-2" />
+                      )}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              ¿Eliminar almacén?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta acción es permanente y eliminará el almacén "
+                              {store.name}" junto con todo su inventario
+                              asociado. ¿Estás seguro?
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              Cancelar
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={(e) =>
+                                handleDeleteStore(e, store.id, store.name)
+                              }
+                            >
+                              Eliminar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
                 ))
               )}
             </div>

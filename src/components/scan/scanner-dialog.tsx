@@ -39,6 +39,7 @@ export function ScannerDialog({
   const [isStopping, setIsStopping] = useState(false);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const successTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isHandlingSuccessRef = useRef(false);
 
 
   const stopScanner = useCallback(async () => {
@@ -51,23 +52,26 @@ export function ScannerDialog({
       } finally {
         setIsScanning(false);
         setIsStopping(false);
-        // Do not nullify ref here to allow restart
       }
     }
   }, [isStopping]);
 
 
   const handleScanSuccess = useCallback((decodedText: string) => {
-      onScanSuccess(decodedText);
-      setShowSuccessOverlay(true);
-      
-      if(successTimeoutRef.current) {
-        clearTimeout(successTimeoutRef.current);
-      }
-      
-      successTimeoutRef.current = setTimeout(() => {
-        setShowSuccessOverlay(false);
-      }, 500);
+    if (isHandlingSuccessRef.current) return;
+
+    isHandlingSuccessRef.current = true;
+    onScanSuccess(decodedText);
+    setShowSuccessOverlay(true);
+    
+    if(successTimeoutRef.current) {
+      clearTimeout(successTimeoutRef.current);
+    }
+    
+    successTimeoutRef.current = setTimeout(() => {
+      setShowSuccessOverlay(false);
+      isHandlingSuccessRef.current = false;
+    }, 500);
 
   }, [onScanSuccess]);
 
@@ -75,20 +79,19 @@ export function ScannerDialog({
   const startScanner = useCallback(async (cameraId: string) => {
     if (!open || isScanning || !document.getElementById(qrcodeRegionId)) return;
     
-    // Ensure we have a fresh instance if it was stopped completely
     if (!html5QrcodeRef.current) {
         html5QrcodeRef.current = new Html5Qrcode(qrcodeRegionId, false);
     }
     
-    const newScanner = html5QrcodeRef.current;
-    if (newScanner.isScanning) {
+    const scanner = html5QrcodeRef.current;
+    if (scanner.isScanning) {
         return;
     }
     
     try {
       setIsScanning(true);
       setErrorMessage(null);
-      await newScanner.start(
+      await scanner.start(
         cameraId,
         {
           fps: 10,
@@ -101,7 +104,7 @@ export function ScannerDialog({
         },
         handleScanSuccess,
         (error) => {
-          // Do nothing on error, it's verbose
+          // Do nothing on scan error, it's verbose
         }
       );
     } catch (err: any) {
@@ -109,7 +112,9 @@ export function ScannerDialog({
         if (err.name === 'NotAllowedError') {
             setErrorMessage('Permiso de cámara denegado. Por favor, habilítalo en los ajustes de tu navegador.')
         } else {
-            setErrorMessage(`Error al iniciar escáner: ${err.message || 'Error desconocido.'}`);
+            // Don't show generic error which might be confusing
+            console.error("Scanner start error:", err);
+            // setErrorMessage(`Error al iniciar escáner: ${err.message || 'Error desconocido.'}`);
         }
     }
   }, [open, isScanning, handleScanSuccess]);
@@ -129,12 +134,16 @@ export function ScannerDialog({
           }
         })
         .catch((err) => {
-          setErrorMessage(`No se pudo acceder a las cámaras: ${err.message}`);
+            if (err.name === 'NotAllowedError') {
+                setErrorMessage('Permiso de cámara denegado. Por favor, habilítalo en los ajustes de tu navegador.');
+            } else {
+                 setErrorMessage(`No se pudo acceder a las cámaras: ${err.message}`);
+            }
         });
     } else {
        stopScanner();
     }
-  }, [open]);
+  }, [open, selectedCameraId]);
 
   useEffect(() => {
     // Cleanup on unmount
@@ -148,10 +157,11 @@ export function ScannerDialog({
 
   useEffect(() => {
     if (open && selectedCameraId) {
-        // If we switch camera, we need to stop the old one first
-        if (html5QrcodeRef.current?.isScanning) {
+        const scanner = html5QrcodeRef.current;
+        if (scanner && scanner.isScanning) {
             stopScanner().then(() => {
-                startScanner(selectedCameraId);
+                // Give the DOM a moment to settle before restarting
+                setTimeout(() => startScanner(selectedCameraId), 50);
             });
         } else {
             startScanner(selectedCameraId);
@@ -186,10 +196,10 @@ export function ScannerDialog({
           
           {/* Success Overlay */}
           <div className={cn(
-              "absolute inset-0 bg-green-500/80 flex items-center justify-center transition-opacity duration-300",
-              showSuccessOverlay ? "opacity-100" : "opacity-0 pointer-events-none"
+              "absolute inset-0 flex items-center justify-center transition-opacity duration-300 pointer-events-none",
+              showSuccessOverlay ? "opacity-100" : "opacity-0"
           )}>
-              <CheckCircle className="h-32 w-32 text-white" />
+              <CheckCircle className="h-32 w-32 text-green-500 drop-shadow-lg" />
           </div>
 
 

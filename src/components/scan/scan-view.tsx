@@ -1,18 +1,18 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { useInventory } from '@/lib/hooks/use-inventory';
 import type { Location } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { Camera, Boxes, Warehouse, CheckCircle, XCircle } from 'lucide-react';
+import { Camera, Boxes, Warehouse, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ScannerDialog } from './scanner-dialog';
 
 export function ScanView() {
-  const { activeStore, scanItem, recentScans } = useInventory();
+  const { activeStore, scanItem, recentScans, masterProducts } = useInventory();
   const [location, setLocation] = useState<Location>('Mueble');
   const [manualEan, setManualEan] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -20,13 +20,24 @@ export function ScanView() {
   const { toast } = useToast();
   const [highlightedScanId, setHighlightedScanId] = useState<string | null>(null);
 
-  const handleScan = (ean: string) => {
+  const handleScan = useCallback((ean: string) => {
     if (!ean) return;
     if (!activeStore) {
       toast({
         variant: 'destructive',
         title: 'Error',
         description: 'Por favor, selecciona un almacén primero.',
+      });
+      return;
+    }
+    
+    const product = masterProducts.find((p) => p.ean === ean);
+    
+    if (!product) {
+      toast({
+        variant: 'destructive',
+        title: 'Producto Desconocido',
+        description: `El EAN "${ean}" no se encontró en la base de datos.`,
       });
       return;
     }
@@ -40,7 +51,7 @@ export function ScanView() {
     });
     
     setManualEan(''); // Clear manual input after scan
-  };
+  }, [activeStore, location, scanItem, toast, masterProducts]);
   
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,10 +102,11 @@ export function ScanView() {
               value={manualEan}
               onChange={(e) => setManualEan(e.target.value)}
               className="h-12 text-center text-lg"
+              disabled={isPending}
             />
           </form>
 
-          <Button onClick={() => setScannerOpen(true)} className="w-full h-20 text-xl" >
+          <Button onClick={() => setScannerOpen(true)} className="w-full h-20 text-xl" disabled={isPending}>
             <Camera className="mr-4 h-8 w-8" /> Escanear con Cámara
           </Button>
         </CardContent>
@@ -115,11 +127,11 @@ export function ScanView() {
                         <Card key={scan.id} className={cn(
                             'transition-all duration-500', 
                             isHighlighted && isKnown && 'bg-green-100 dark:bg-green-900 border-green-500',
-                            isHighlighted && !isKnown && 'bg-yellow-100 dark:bg-yellow-900 border-yellow-500'
+                             isHighlighted && !isKnown && 'bg-yellow-100 dark:bg-yellow-900 border-yellow-500'
                         )}>
                             <CardContent className="p-3 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    {isKnown ? <CheckCircle className="h-5 w-5 text-green-600" /> : <XCircle className="h-5 w-5 text-red-600" />}
+                                    {isKnown ? <CheckCircle className="h-5 w-5 text-green-600" /> : <AlertCircle className="h-5 w-5 text-yellow-600" />}
                                     <div>
                                         <p className="font-bold">{scan.description}</p>
                                         <p className="text-sm text-muted-foreground">{scan.ean}</p>

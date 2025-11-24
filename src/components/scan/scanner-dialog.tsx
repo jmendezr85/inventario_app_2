@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -9,6 +9,13 @@ import { Html5Qrcode, type CameraDevice } from 'html5-qrcode';
 import { Button } from '../ui/button';
 import { Video, X } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface ScannerDialogProps {
   open: boolean;
@@ -28,24 +35,45 @@ export function ScannerDialog({
   const [cameras, setCameras] = useState<CameraDevice[]>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string | undefined>();
   const [isScanning, setIsScanning] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
 
-  const stopScanner = useCallback(() => {
-    if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning) {
-      setIsScanning(false);
-      return html5QrcodeRef.current.stop();
+
+  const stopScanner = useCallback(async () => {
+    if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning && !isStopping) {
+      setIsStopping(true);
+      try {
+        await html5QrcodeRef.current.stop();
+      } catch (err) {
+        console.error("Failed to stop scanner cleanly", err);
+      } finally {
+        setIsScanning(false);
+        setIsStopping(false);
+        html5QrcodeRef.current = null;
+      }
     }
-    return Promise.resolve();
-  }, []);
+  }, [isStopping]);
+
+
+  const handleScanSuccess = useCallback((decodedText: string) => {
+      onScanSuccess(decodedText);
+      onOpenChange(false);
+  }, [onScanSuccess, onOpenChange]);
+
 
   const startScanner = useCallback(async (cameraId: string) => {
-    if (!open || !document.getElementById(qrcodeRegionId)) return;
+    if (!open || isScanning || !document.getElementById(qrcodeRegionId)) return;
     
-    html5QrcodeRef.current = new Html5Qrcode(qrcodeRegionId, false);
+    // Ensure we have a fresh instance
+    if (html5QrcodeRef.current) {
+      await stopScanner();
+    }
+
+    const newScanner = new Html5Qrcode(qrcodeRegionId, false);
+    html5QrcodeRef.current = newScanner;
     
     try {
-      await stopScanner(); // Make sure any previous scanner is stopped
       setIsScanning(true);
-      await html5QrcodeRef.current.start(
+      await newScanner.start(
         cameraId,
         {
           fps: 10,
@@ -56,9 +84,7 @@ export function ScannerDialog({
           },
           aspectRatio: 1.0,
         },
-        (decodedText, _decodedResult) => {
-          onScanSuccess(decodedText);
-        },
+        handleScanSuccess,
         (error) => {
           // Do nothing, error is verbose
         }
@@ -68,7 +94,7 @@ export function ScannerDialog({
         setIsScanning(false);
         setErrorMessage(`Error al iniciar escáner: ${err.message || 'Error desconocido.'}`);
     }
-  }, [open, onScanSuccess, stopScanner]);
+  }, [open, isScanning, stopScanner, handleScanSuccess]);
   
   useEffect(() => {
     if (open) {
@@ -76,9 +102,11 @@ export function ScannerDialog({
         .then((devices) => {
           if (devices && devices.length) {
             setCameras(devices);
-            // Prefer back camera
-            const backCamera = devices.find(d => d.label.toLowerCase().includes('back')) || devices[0];
-            setSelectedCameraId(backCamera.id);
+            if (!selectedCameraId) {
+                // Prefer back camera
+                const backCamera = devices.find(d => d.label.toLowerCase().includes('back')) || devices[0];
+                setSelectedCameraId(backCamera.id);
+            }
           } else {
             setErrorMessage('No se encontraron cámaras en este dispositivo.');
           }
@@ -89,17 +117,22 @@ export function ScannerDialog({
     } else {
        stopScanner();
     }
-     // Cleanup function
-    return () => {
-      stopScanner();
-    };
-  }, [open]);
+  }, [open, selectedCameraId]); // Removed stopScanner from here
 
   useEffect(() => {
-    if (selectedCameraId) {
+    // Cleanup on unmount
+    return () => {
+        if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning) {
+            html5QrcodeRef.current.stop().catch(err => console.log("Cleanup stop failed", err));
+        }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (open && selectedCameraId) {
         startScanner(selectedCameraId);
     }
-  }, [selectedCameraId, startScanner]);
+  }, [open, selectedCameraId, startScanner]);
 
 
   const handleClose = () => {
@@ -130,14 +163,14 @@ export function ScannerDialog({
             onClick={handleClose}
             variant="ghost"
             size="icon"
-            className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white hover:text-white rounded-full"
+            className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white hover:text-white rounded-full z-20"
           >
             <X className="h-6 w-6" />
           </Button>
         </div>
 
         {(errorMessage || cameras.length > 1) && (
-            <div className="p-4 bg-background/80 backdrop-blur-sm space-y-2">
+            <div className="absolute bottom-0 left-0 right-0 p-4 bg-black/50 backdrop-blur-sm space-y-2 z-10">
             {errorMessage && (
                 <Alert variant="destructive">
                     <Video className="h-4 w-4" />
@@ -145,9 +178,26 @@ export function ScannerDialog({
                     <AlertDescription>{errorMessage}</AlertDescription>
                 </Alert>
             )}
+             {cameras.length > 1 && (
+                <Select value={selectedCameraId} onValueChange={setSelectedCameraId}>
+                    <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Seleccionar cámara" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {cameras.map(camera => (
+                            <SelectItem key={camera.id} value={camera.id}>{camera.label}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+             )}
             </div>
         )}
         <style jsx>{`
+            #html5qr-code-full-region video {
+                width: 100% !important;
+                height: 100% !important;
+                object-fit: cover;
+            }
             @keyframes scan-line-animation {
                 0% { transform: translateY(-120px); opacity: 0.5; }
                 50% { transform: translateY(120px); opacity: 1; }
@@ -161,6 +211,3 @@ export function ScannerDialog({
     </Dialog>
   );
 }
-
-// React.useCallback is used to memoize functions
-const { useCallback } = require('react');

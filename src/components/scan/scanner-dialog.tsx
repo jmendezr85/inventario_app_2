@@ -26,6 +26,7 @@ interface ScannerDialogProps {
 }
 
 type ScanningStatus = 'stopped' | 'starting' | 'scanning' | 'error';
+const SCANNER_ELEMENT_ID = 'html5qr-code-full-region';
 
 
 export function ScannerDialog({
@@ -33,7 +34,6 @@ export function ScannerDialog({
   onOpenChange,
   onScanSuccess,
 }: ScannerDialogProps) {
-  const scannerRef = useRef<HTMLDivElement>(null);
   const html5QrcodeRef = useRef<Html5Qrcode | null>(null);
   const [cameras, setCameras] = useState<CameraDevice[]>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string | undefined>();
@@ -44,17 +44,15 @@ export function ScannerDialog({
   const isHandlingSuccessRef = useRef(false);
 
   const stopScanner = useCallback(async () => {
-    if (status !== 'scanning' && status !== 'starting') return;
-
-    if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning) {
-      try {
-        await html5QrcodeRef.current.stop();
-      } catch (err) {
-        console.error('Failed to stop the scanner gracefully:', err);
-      }
-    }
-    html5QrcodeRef.current = null;
+    if (status !== 'scanning') return;
     setStatus('stopped');
+    try {
+        if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning) {
+            await html5QrcodeRef.current.stop();
+        }
+    } catch (err) {
+        console.error('Failed to stop the scanner gracefully:', err);
+    }
   }, [status]);
 
 
@@ -75,17 +73,16 @@ export function ScannerDialog({
     }, 500);
   }, [onScanSuccess]);
 
-  useEffect(() => {
-    const startScanner = async () => {
-      if (!scannerRef.current || status !== 'stopped') return;
+  const startScanner = useCallback(async () => {
+      if (status !== 'stopped') return;
       
       setStatus('starting');
       setErrorMessage(null);
-
-      html5QrcodeRef.current = new Html5Qrcode(scannerRef.current, { verbose: false });
-      const scanner = html5QrcodeRef.current;
-
+      
       try {
+        html5QrcodeRef.current = new Html5Qrcode(SCANNER_ELEMENT_ID, { verbose: false });
+        const scanner = html5QrcodeRef.current;
+
         const devices = await Html5Qrcode.getCameras();
         if (devices && devices.length) {
           setCameras(devices);
@@ -120,16 +117,17 @@ export function ScannerDialog({
          setErrorMessage(message);
          setStatus('error');
       }
-    };
+    }, [handleScanSuccess, selectedCameraId, status]);
 
+
+  useEffect(() => {
     if (open) {
       startScanner();
-    } else {
-      stopScanner();
     }
-
+    
+    // Return a cleanup function
     return () => {
-        if(html5QrcodeRef.current?.isScanning){
+        if(html5QrcodeRef.current?.isScanning) {
             stopScanner();
         }
     };
@@ -142,7 +140,7 @@ export function ScannerDialog({
       <DialogContent className="max-w-full h-full w-full p-0 m-0 flex flex-col bg-black border-0">
         <DialogTitle className="sr-only">Escáner de código de barras</DialogTitle>
         <div className="relative w-full flex-1">
-          <div ref={scannerRef} className="w-full h-full" />
+          <div id={SCANNER_ELEMENT_ID} className="w-full h-full" />
           
           <div className="absolute inset-0 pointer-events-none">
               <div className="w-full h-full flex items-center justify-center">
@@ -204,7 +202,7 @@ export function ScannerDialog({
             </div>
         )}
         <style jsx>{`
-            div[ref] video {
+            div#${SCANNER_ELEMENT_ID} video {
                 width: 100% !important;
                 height: 100% !important;
                 object-fit: cover;

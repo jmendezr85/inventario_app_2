@@ -38,7 +38,7 @@ export function ScannerDialog({
   const [selectedCameraId, setSelectedCameraId] = useState<string | undefined>();
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const isHandlingSuccessRef = useRef(false);
-  const stopScannerRef = useRef<() => void>(() => {});
+  const stopScannerRef = useRef<() => Promise<void>>();
 
   const handleScanSuccess = useCallback((decodedText: string) => {
     if (isHandlingSuccessRef.current) return;
@@ -55,17 +55,15 @@ export function ScannerDialog({
 
   useEffect(() => {
     if (open) {
-      const qrcodeElement = document.getElementById(qrcodeRegionId);
-      if (!qrcodeElement) return;
+      // Ensure the container is in the DOM
+      const qrCodeRegion = document.getElementById(qrcodeRegionId);
+      if (!qrCodeRegion) return;
 
       const scanner = new Html5Qrcode(qrcodeRegionId, false);
       html5QrcodeRef.current = scanner;
-      let isMounted = true;
 
       const startScanner = async (cameraId: string) => {
-        if (!isMounted || !scanner || scanner.isScanning) return;
         try {
-          setErrorMessage(null);
           await scanner.start(
             cameraId,
             {
@@ -74,35 +72,34 @@ export function ScannerDialog({
               aspectRatio: 1.0,
             },
             handleScanSuccess,
-            () => {}
+            () => {} // qrCodeErrorCallback
           );
+          setErrorMessage(null);
         } catch (err: any) {
-          if (!isMounted) return;
-          if (err.name === 'NotAllowedError') {
+          console.error("Error starting scanner:", err);
+           if (err.name === 'NotAllowedError') {
             setErrorMessage('Permiso de cámara denegado. Por favor, habilítalo en los ajustes de tu navegador.');
           } else {
-            setErrorMessage(`Error al iniciar el escaner: ${err.name || 'Error desconocido'}`);
+            setErrorMessage(`Error al iniciar el escaner: ${err.message || 'Error desconocido'}`);
           }
         }
       };
 
-      const setupAndStartScanner = async () => {
+      const setupScanner = async () => {
         try {
           const devices = await Html5Qrcode.getCameras();
-          if (!isMounted) return;
-
           if (devices && devices.length) {
             setCameras(devices);
             const camId = selectedCameraId || (devices.find(d => d.label.toLowerCase().includes('back')) || devices[0]).id;
             if (!selectedCameraId) {
-                setSelectedCameraId(camId);
+              setSelectedCameraId(camId);
             }
-            startScanner(camId);
+            await startScanner(camId);
           } else {
-            setErrorMessage('No se encontraron cámaras en este dispositivo.');
+            setErrorMessage('No se encontraron cámaras.');
           }
         } catch (err: any) {
-          if (!isMounted) return;
+          console.error("Error getting cameras:", err);
           if (err.name === 'NotAllowedError') {
             setErrorMessage('Permiso de cámara denegado. Por favor, habilítalo en los ajustes de tu navegador.');
           } else {
@@ -111,25 +108,26 @@ export function ScannerDialog({
         }
       };
 
-      setupAndStartScanner();
+      setupScanner();
 
       stopScannerRef.current = async () => {
-        isMounted = false;
         if (scanner && scanner.isScanning) {
           try {
             await scanner.stop();
           } catch (err) {
-            console.error("Error al detener el escaner:", err);
+            console.error('Failed to stop the scanner gracefully:', err);
           }
         }
       };
     } else {
-      stopScannerRef.current();
+      // When dialog is closed, call the cleanup function
+      stopScannerRef.current?.();
     }
-    
+
+    // Cleanup function on component unmount (or before re-running effect)
     return () => {
-        if(open) stopScannerRef.current();
-    }
+      stopScannerRef.current?.();
+    };
   }, [open, selectedCameraId, handleScanSuccess]);
 
 

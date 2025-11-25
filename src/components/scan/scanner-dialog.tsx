@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Html5Qrcode, type CameraDevice } from 'html5-qrcode';
 import { Button } from '../ui/button';
-import { Video, X, CheckCircle } from 'lucide-react';
+import { Video, X, CheckCircle, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import {
   Select,
@@ -26,19 +26,35 @@ interface ScannerDialogProps {
 }
 
 const qrcodeRegionId = 'html5qr-code-full-region';
+type ScanningStatus = 'stopped' | 'starting' | 'scanning' | 'error';
+
 
 export function ScannerDialog({
   open,
   onOpenChange,
   onScanSuccess,
 }: ScannerDialogProps) {
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const html5QrcodeRef = useRef<Html5Qrcode | null>(null);
   const [cameras, setCameras] = useState<CameraDevice[]>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string | undefined>();
+  const [status, setStatus] = useState<ScanningStatus>('stopped');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const isHandlingSuccessRef = useRef(false);
-  
+
+  const stopScanner = useCallback(async () => {
+    if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning) {
+      try {
+        await html5QrcodeRef.current.stop();
+      } catch (err) {
+        console.error('Failed to stop the scanner gracefully:', err);
+        // Don't set an error message here, as the component is likely unmounting.
+      }
+    }
+    setStatus('stopped');
+  }, []);
+
   const handleScanSuccess = useCallback((decodedText: string) => {
     if (isHandlingSuccessRef.current) return;
     isHandlingSuccessRef.current = true;
@@ -46,84 +62,80 @@ export function ScannerDialog({
     onScanSuccess(decodedText);
     setShowSuccessOverlay(true);
 
+    // Vibrate for feedback on mobile devices
+    if (navigator.vibrate) {
+      navigator.vibrate(100);
+    }
+
     setTimeout(() => {
       setShowSuccessOverlay(false);
       isHandlingSuccessRef.current = false;
     }, 500);
   }, [onScanSuccess]);
 
-  const stopScanner = useCallback(async () => {
-    if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning) {
-        try {
-            await html5QrcodeRef.current.stop();
-        } catch (err) {
-            console.error('Failed to stop the scanner gracefully:', err);
-        }
-    }
-  }, []);
-
-  
   useEffect(() => {
     if (open) {
-      if (!html5QrcodeRef.current) {
-        html5QrcodeRef.current = new Html5Qrcode(qrcodeRegionId, false);
-      }
-      const scanner = html5QrcodeRef.current;
+      const startScanner = async () => {
+        if (status !== 'stopped') return;
+        
+        setStatus('starting');
+        setErrorMessage(null);
 
-      const startScanner = async (cameraId: string) => {
-        try {
-          await scanner.start(
-            cameraId,
-            {
-              fps: 10,
-              qrbox: (w, h) => ({ width: Math.min(w, h) * 0.8, height: Math.min(w, h) * 0.4 }),
-              aspectRatio: 1.7777778, // 16:9
-            },
-            handleScanSuccess,
-            () => {} // qrCodeErrorCallback (optional)
-          );
-          setErrorMessage(null);
-        } catch (err: any) {
-           console.error("Error starting scanner:", err);
-           if (err.name === 'NotAllowedError') {
-            setErrorMessage('Permiso de cámara denegado. Por favor, habilítalo en los ajustes de tu navegador.');
-          } else {
-            setErrorMessage(`Error al iniciar el escaner: ${err.message || 'Could not start video source'}`);
-          }
+        // Initialize on first use
+        if (!html5QrcodeRef.current) {
+          html5QrcodeRef.current = new Html5Qrcode(qrcodeRegionId, false);
         }
-      };
+        const scanner = html5QrcodeRef.current;
 
-      const setupScanner = async () => {
         try {
           const devices = await Html5Qrcode.getCameras();
           if (devices && devices.length) {
             setCameras(devices);
-            const camId = selectedCameraId || (devices.find(d => d.label.toLowerCase().includes('back')) || devices[0]).id;
-            setSelectedCameraId(camId);
-            await startScanner(camId);
+            
+            let camId = selectedCameraId;
+            if (!camId) {
+                // Prefer back camera
+                const backCam = devices.find(d => d.label.toLowerCase().includes('back'));
+                camId = (backCam || devices[0]).id;
+                setSelectedCameraId(camId);
+            }
+
+            await scanner.start(
+              camId,
+              {
+                fps: 10,
+                qrbox: (w, h) => ({ width: Math.min(w, h) * 0.8, height: Math.min(w, h) * 0.4 }),
+                aspectRatio: 1.7777778, // 16:9 for better mobile camera compatibility
+              },
+              handleScanSuccess,
+              () => {} // qrCodeErrorCallback (optional, we handle errors in the catch block)
+            );
+            setStatus('scanning');
           } else {
-            setErrorMessage('No se encontraron cámaras.');
+             throw new Error('No se encontraron cámaras en este dispositivo.');
           }
         } catch (err: any) {
-          console.error("Error getting cameras:", err);
-          if (err.name === 'NotAllowedError') {
-            setErrorMessage('Permiso de cámara denegado. Por favor, habilítalo en los ajustes de tu navegador.');
-          } else {
-            setErrorMessage(`No se pudo acceder a las cámaras: ${err.message}`);
-          }
+           console.error("Error starting scanner:", err);
+           let message = `Error al iniciar el escaner: ${err.message || 'Could not start video source'}`;
+           if (err.name === 'NotAllowedError') {
+            message = 'Permiso de cámara denegado. Por favor, habilítalo en los ajustes de tu navegador.';
+           }
+           setErrorMessage(message);
+           setStatus('error');
         }
       };
 
-      setupScanner();
+      startScanner();
 
     } else {
       stopScanner();
     }
 
+    // Cleanup function to ensure scanner stops when dialog is closed/unmounted
     return () => {
-        stopScanner();
+      stopScanner();
     };
-  }, [open, selectedCameraId, handleScanSuccess, stopScanner]);
+  }, [open, selectedCameraId, handleScanSuccess, stopScanner, status]);
 
 
   return (
@@ -140,10 +152,17 @@ export function ScannerDialog({
                       <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-primary rounded-tr-xl"></div>
                       <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-primary rounded-bl-xl"></div>
                       <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-primary rounded-br-xl"></div>
-                      <div className="absolute top-1/2 left-0 w-full h-0.5 bg-red-500/70 shadow-[0_0_10px_0_rgba(255,0,0,0.7)] animate-scan-line"></div>
+                      {status === 'scanning' && <div className="absolute top-1/2 left-0 w-full h-0.5 bg-red-500/70 shadow-[0_0_10px_0_rgba(255,0,0,0.7)] animate-scan-line"></div>}
                   </div>
               </div>
           </div>
+
+          {status === 'starting' && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 text-white">
+                <Loader2 className="h-12 w-12 animate-spin mb-4" />
+                <p>Iniciando cámara...</p>
+            </div>
+          )}
           
           <div className={cn(
               "absolute inset-0 flex items-center justify-center bg-green-500/20 transition-opacity duration-300 pointer-events-none",
@@ -162,17 +181,17 @@ export function ScannerDialog({
           </Button>
         </div>
 
-        {(errorMessage || cameras.length > 1) && (
+        {(status === 'error' || cameras.length > 1) && (
             <div className="absolute bottom-0 left-0 right-0 p-4 bg-black/70 backdrop-blur-sm space-y-2 z-10 rounded-t-lg">
-            {errorMessage && (
+            {status === 'error' && errorMessage && (
                 <Alert variant="destructive">
                     <Video className="h-4 w-4" />
                     <AlertTitle>Error de Cámara</AlertTitle>
                     <AlertDescription>{errorMessage}</AlertDescription>
                 </Alert>
             )}
-             {cameras.length > 1 && !errorMessage && (
-                <Select value={selectedCameraId} onValueChange={setSelectedCameraId}>
+             {cameras.length > 1 && (
+                <Select value={selectedCameraId} onValueChange={setSelectedCameraId} disabled={status === 'scanning'}>
                     <SelectTrigger className="w-full bg-gray-800 border-gray-700 text-white">
                         <SelectValue placeholder="Seleccionar cámara" />
                     </SelectTrigger>
@@ -186,7 +205,7 @@ export function ScannerDialog({
             </div>
         )}
         <style jsx>{`
-            #html5qr-code-full-region video {
+            #${qrcodeRegionId} video {
                 width: 100% !important;
                 height: 100% !important;
                 object-fit: cover;

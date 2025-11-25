@@ -25,7 +25,6 @@ interface ScannerDialogProps {
   onScanSuccess: (decodedText: string) => void;
 }
 
-const qrcodeRegionId = 'html5qr-code-full-region';
 type ScanningStatus = 'stopped' | 'starting' | 'scanning' | 'error';
 
 
@@ -34,6 +33,7 @@ export function ScannerDialog({
   onOpenChange,
   onScanSuccess,
 }: ScannerDialogProps) {
+  const scannerRef = useRef<HTMLDivElement>(null);
   const html5QrcodeRef = useRef<Html5Qrcode | null>(null);
   const [cameras, setCameras] = useState<CameraDevice[]>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string | undefined>();
@@ -53,6 +53,7 @@ export function ScannerDialog({
         console.error('Failed to stop the scanner gracefully:', err);
       }
     }
+    html5QrcodeRef.current = null;
     setStatus('stopped');
   }, [status]);
 
@@ -76,14 +77,12 @@ export function ScannerDialog({
 
   useEffect(() => {
     const startScanner = async () => {
-      if (status !== 'stopped') return;
+      if (!scannerRef.current || status !== 'stopped') return;
       
       setStatus('starting');
       setErrorMessage(null);
 
-      if (!html5QrcodeRef.current) {
-        html5QrcodeRef.current = new Html5Qrcode(qrcodeRegionId, { verbose: false });
-      }
+      html5QrcodeRef.current = new Html5Qrcode(scannerRef.current, { verbose: false });
       const scanner = html5QrcodeRef.current;
 
       try {
@@ -130,9 +129,9 @@ export function ScannerDialog({
     }
 
     return () => {
-      // Return the cleanup function, don't call it directly.
-      // React will execute this when the component unmounts or dependencies change.
-      stopScanner();
+        if(html5QrcodeRef.current?.isScanning){
+            stopScanner();
+        }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, selectedCameraId]);
@@ -143,7 +142,7 @@ export function ScannerDialog({
       <DialogContent className="max-w-full h-full w-full p-0 m-0 flex flex-col bg-black border-0">
         <DialogTitle className="sr-only">Escáner de código de barras</DialogTitle>
         <div className="relative w-full flex-1">
-          <div id={qrcodeRegionId} className="w-full h-full" />
+          <div ref={scannerRef} className="w-full h-full" />
           
           <div className="absolute inset-0 pointer-events-none">
               <div className="w-full h-full flex items-center justify-center">
@@ -205,7 +204,7 @@ export function ScannerDialog({
             </div>
         )}
         <style jsx>{`
-            #${qrcodeRegionId} video {
+            div[ref] video {
                 width: 100% !important;
                 height: 100% !important;
                 object-fit: cover;

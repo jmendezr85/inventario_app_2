@@ -43,19 +43,6 @@ export function ScannerDialog({
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const isHandlingSuccessRef = useRef(false);
 
-  const stopScanner = useCallback(async () => {
-    if (status !== 'scanning') return;
-    setStatus('stopped');
-    try {
-        if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning) {
-            await html5QrcodeRef.current.stop();
-        }
-    } catch (err) {
-        console.error('Failed to stop the scanner gracefully:', err);
-    }
-  }, [status]);
-
-
   const handleScanSuccess = useCallback((decodedText: string) => {
     if (isHandlingSuccessRef.current) return;
     isHandlingSuccessRef.current = true;
@@ -72,15 +59,30 @@ export function ScannerDialog({
       isHandlingSuccessRef.current = false;
     }, 500);
   }, [onScanSuccess]);
+  
+  const stopScanner = useCallback(async () => {
+    if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning) {
+      setStatus('stopped');
+      try {
+        await html5QrcodeRef.current.stop();
+        html5QrcodeRef.current.clear();
+      } catch (err) {
+        console.error('Failed to stop the scanner gracefully:', err);
+      }
+    }
+  }, []);
+
 
   const startScanner = useCallback(async () => {
-      if (status !== 'stopped') return;
+      if (status !== 'stopped' || !open) return;
       
       setStatus('starting');
       setErrorMessage(null);
       
       try {
-        html5QrcodeRef.current = new Html5Qrcode(SCANNER_ELEMENT_ID, { verbose: false });
+        if (!html5QrcodeRef.current) {
+            html5QrcodeRef.current = new Html5Qrcode(SCANNER_ELEMENT_ID, false);
+        }
         const scanner = html5QrcodeRef.current;
 
         const devices = await Html5Qrcode.getCameras();
@@ -116,8 +118,9 @@ export function ScannerDialog({
          }
          setErrorMessage(message);
          setStatus('error');
+         stopScanner();
       }
-    }, [handleScanSuccess, selectedCameraId, status]);
+    }, [handleScanSuccess, selectedCameraId, status, open, stopScanner]);
 
 
   useEffect(() => {
@@ -127,16 +130,17 @@ export function ScannerDialog({
     
     // Return a cleanup function
     return () => {
-        if(html5QrcodeRef.current?.isScanning) {
-            stopScanner();
-        }
+        stopScanner();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, selectedCameraId]);
 
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+        if (!isOpen) stopScanner();
+        onOpenChange(isOpen);
+    }}>
       <DialogContent className="max-w-full h-full w-full p-0 m-0 flex flex-col bg-black border-0">
         <DialogTitle className="sr-only">Escáner de código de barras</DialogTitle>
         <div className="relative w-full flex-1">

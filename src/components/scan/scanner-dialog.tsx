@@ -44,16 +44,18 @@ export function ScannerDialog({
   const isHandlingSuccessRef = useRef(false);
 
   const stopScanner = useCallback(async () => {
+    if (status !== 'scanning' && status !== 'starting') return;
+
     if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning) {
       try {
         await html5QrcodeRef.current.stop();
       } catch (err) {
         console.error('Failed to stop the scanner gracefully:', err);
-        // Don't set an error message here, as the component is likely unmounting.
       }
     }
     setStatus('stopped');
-  }, []);
+  }, [status]);
+
 
   const handleScanSuccess = useCallback((decodedText: string) => {
     if (isHandlingSuccessRef.current) return;
@@ -62,7 +64,6 @@ export function ScannerDialog({
     onScanSuccess(decodedText);
     setShowSuccessOverlay(true);
 
-    // Vibrate for feedback on mobile devices
     if (navigator.vibrate) {
       navigator.vibrate(100);
     }
@@ -74,68 +75,67 @@ export function ScannerDialog({
   }, [onScanSuccess]);
 
   useEffect(() => {
-    if (open) {
-      const startScanner = async () => {
-        if (status !== 'stopped') return;
-        
-        setStatus('starting');
-        setErrorMessage(null);
+    const startScanner = async () => {
+      if (status !== 'stopped') return;
+      
+      setStatus('starting');
+      setErrorMessage(null);
 
-        // Initialize on first use
-        if (!html5QrcodeRef.current) {
-          html5QrcodeRef.current = new Html5Qrcode(qrcodeRegionId, false);
-        }
-        const scanner = html5QrcodeRef.current;
+      if (!html5QrcodeRef.current) {
+        html5QrcodeRef.current = new Html5Qrcode(qrcodeRegionId, { verbose: false });
+      }
+      const scanner = html5QrcodeRef.current;
 
-        try {
-          const devices = await Html5Qrcode.getCameras();
-          if (devices && devices.length) {
-            setCameras(devices);
-            
-            let camId = selectedCameraId;
-            if (!camId) {
-                // Prefer back camera
-                const backCam = devices.find(d => d.label.toLowerCase().includes('back'));
-                camId = (backCam || devices[0]).id;
-                setSelectedCameraId(camId);
-            }
-
-            await scanner.start(
-              camId,
-              {
-                fps: 10,
-                qrbox: (w, h) => ({ width: Math.min(w, h) * 0.8, height: Math.min(w, h) * 0.4 }),
-                aspectRatio: 1.7777778, // 16:9 for better mobile camera compatibility
-              },
-              handleScanSuccess,
-              () => {} // qrCodeErrorCallback (optional, we handle errors in the catch block)
-            );
-            setStatus('scanning');
-          } else {
-             throw new Error('No se encontraron cámaras en este dispositivo.');
+      try {
+        const devices = await Html5Qrcode.getCameras();
+        if (devices && devices.length) {
+          setCameras(devices);
+          
+          let camId = selectedCameraId;
+          if (!camId) {
+              const backCam = devices.find(d => d.label.toLowerCase().includes('back'));
+              camId = (backCam || devices[0]).id;
+              setSelectedCameraId(camId);
           }
-        } catch (err: any) {
-           console.error("Error starting scanner:", err);
-           let message = `Error al iniciar el escaner: ${err.message || 'Could not start video source'}`;
-           if (err.name === 'NotAllowedError') {
-            message = 'Permiso de cámara denegado. Por favor, habilítalo en los ajustes de tu navegador.';
-           }
-           setErrorMessage(message);
-           setStatus('error');
+
+          await scanner.start(
+            camId,
+            {
+              fps: 10,
+              qrbox: (w, h) => ({ width: Math.min(w, h) * 0.8, height: Math.min(w, h) * 0.4 }),
+              aspectRatio: 1.7777778,
+            },
+            handleScanSuccess,
+            () => {}
+          );
+          setStatus('scanning');
+        } else {
+           throw new Error('No se encontraron cámaras en este dispositivo.');
         }
-      };
+      } catch (err: any) {
+         console.error("Error starting scanner:", err);
+         let message = `Error al iniciar el escaner: ${err.message || 'Could not start video source'}`;
+         if (err.name === 'NotAllowedError') {
+          message = 'Permiso de cámara denegado. Por favor, habilítalo en los ajustes de tu navegador.';
+         }
+         setErrorMessage(message);
+         setStatus('error');
+      }
+    };
 
+    if (open) {
       startScanner();
-
     } else {
       stopScanner();
     }
 
-    // Cleanup function to ensure scanner stops when dialog is closed/unmounted
     return () => {
+      // Return the cleanup function, don't call it directly.
+      // React will execute this when the component unmounts or dependencies change.
       stopScanner();
     };
-  }, [open, selectedCameraId, handleScanSuccess, stopScanner, status]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, selectedCameraId]);
 
 
   return (
@@ -181,7 +181,7 @@ export function ScannerDialog({
           </Button>
         </div>
 
-        {(status === 'error' || cameras.length > 1) && (
+        {(status === 'error' || (status !== 'starting' && cameras.length > 1)) && (
             <div className="absolute bottom-0 left-0 right-0 p-4 bg-black/70 backdrop-blur-sm space-y-2 z-10 rounded-t-lg">
             {status === 'error' && errorMessage && (
                 <Alert variant="destructive">

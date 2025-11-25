@@ -62,6 +62,7 @@ export function ScannerDialog({
     }
   }, []);
 
+  
   useEffect(() => {
     if (open) {
       if (!html5QrcodeRef.current) {

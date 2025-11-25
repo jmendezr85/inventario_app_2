@@ -62,13 +62,12 @@ export function ScannerDialog({
   
   const stopScanner = useCallback(async () => {
     if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning) {
-      setStatus('stopped');
-      try {
-        await html5QrcodeRef.current.stop();
-        html5QrcodeRef.current.clear();
-      } catch (err) {
-        console.error('Failed to stop the scanner gracefully:', err);
-      }
+        setStatus('stopped');
+        try {
+            await html5QrcodeRef.current.stop();
+        } catch (err) {
+            console.error('Failed to stop the scanner gracefully:', err);
+        }
     }
   }, []);
 
@@ -79,12 +78,14 @@ export function ScannerDialog({
       setStatus('starting');
       setErrorMessage(null);
       
-      try {
-        if (!html5QrcodeRef.current) {
-            html5QrcodeRef.current = new Html5Qrcode(SCANNER_ELEMENT_ID, false);
-        }
-        const scanner = html5QrcodeRef.current;
+      if (!html5QrcodeRef.current) {
+        // Initialize here, only once.
+        html5QrcodeRef.current = new Html5Qrcode(SCANNER_ELEMENT_ID, false);
+      }
+      
+      const scanner = html5QrcodeRef.current;
 
+      try {
         const devices = await Html5Qrcode.getCameras();
         if (devices && devices.length) {
           setCameras(devices);
@@ -118,7 +119,7 @@ export function ScannerDialog({
          }
          setErrorMessage(message);
          setStatus('error');
-         stopScanner();
+         await stopScanner();
       }
     }, [handleScanSuccess, selectedCameraId, status, open, stopScanner]);
 
@@ -128,17 +129,14 @@ export function ScannerDialog({
       startScanner();
     }
     
-    // Return a cleanup function
     return () => {
         stopScanner();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, selectedCameraId]);
+  }, [open, selectedCameraId, startScanner, stopScanner]);
 
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
-        if (!isOpen) stopScanner();
         onOpenChange(isOpen);
     }}>
       <DialogContent className="max-w-full h-full w-full p-0 m-0 flex flex-col bg-black border-0">

@@ -39,12 +39,10 @@ export function ScannerDialog({
   const [status, setStatus] = useState<ScanningStatus>('stopped');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
-  // Ref to prevent multiple scans from being processed simultaneously
   const isHandlingSuccessRef = useRef(false);
   const [showSuccessRing, setShowSuccessRing] = useState(false);
 
   const handleScanSuccess = useCallback((decodedText: string) => {
-    // Prevent processing a new scan while one is already being handled
     if (isHandlingSuccessRef.current) return;
     
     isHandlingSuccessRef.current = true;
@@ -54,10 +52,8 @@ export function ScannerDialog({
       navigator.vibrate(100);
     }
 
-    // Flash a success ring for visual feedback without stopping the scan
     setShowSuccessRing(true);
 
-    // After a short delay, reset the refs to allow the next scan
     setTimeout(() => {
       setShowSuccessRing(false);
       isHandlingSuccessRef.current = false;
@@ -69,8 +65,6 @@ export function ScannerDialog({
         setStatus('stopped');
         try {
             await html5QrcodeRef.current.stop();
-            html5QrcodeRef.current.clear();
-            html5QrcodeRef.current = null;
         } catch (err) {
             console.error('Failed to stop the scanner gracefully:', err);
         }
@@ -79,7 +73,7 @@ export function ScannerDialog({
 
   useEffect(() => {
     const startScanner = async () => {
-      if (!open || status !== 'stopped') return;
+      if (status !== 'stopped') return;
 
       setStatus('starting');
       setErrorMessage(null);
@@ -139,10 +133,12 @@ export function ScannerDialog({
 
     if (open) {
       startScanner();
+    } else {
+      stopScanner();
     }
 
     return () => {
-        stopScanner();
+      stopScanner();
     };
   }, [open, selectedCameraId, handleScanSuccess, stopScanner]);
 

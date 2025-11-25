@@ -75,7 +75,6 @@ export function ScannerDialog({
     if (!container) return;
 
     if (!html5QrcodeRef.current) {
-        // Correct initialization with verbose as a boolean, not an object
         html5QrcodeRef.current = new Html5Qrcode(qrcodeRegionId, false);
     }
     const scanner = html5QrcodeRef.current;
@@ -92,9 +91,8 @@ export function ScannerDialog({
         await scanner.start(
           cameraId,
           {
-            fps: 10, // Fluid FPS for scanning
+            fps: 10,
             qrbox: (viewfinderWidth, viewfinderHeight) => {
-                // Creates a square scanning box that's 85% of the smaller viewport dimension
                 const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
                 const qrboxSize = Math.floor(minEdge * 0.85);
                 return { width: qrboxSize, height: qrboxSize };
@@ -240,5 +238,3 @@ export function ScannerDialog({
     </Dialog>
   );
 }
-
-    

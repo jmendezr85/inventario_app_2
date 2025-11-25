@@ -38,8 +38,7 @@ export function ScannerDialog({
   const [selectedCameraId, setSelectedCameraId] = useState<string | undefined>();
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const isHandlingSuccessRef = useRef(false);
-  const stopScannerRef = useRef<() => Promise<void>>();
-
+  
   const handleScanSuccess = useCallback((decodedText: string) => {
     if (isHandlingSuccessRef.current) return;
     isHandlingSuccessRef.current = true;
@@ -53,14 +52,22 @@ export function ScannerDialog({
     }, 500);
   }, [onScanSuccess]);
 
+  const stopScanner = useCallback(async () => {
+    if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning) {
+        try {
+            await html5QrcodeRef.current.stop();
+        } catch (err) {
+            console.error('Failed to stop the scanner gracefully:', err);
+        }
+    }
+  }, []);
+
   useEffect(() => {
     if (open) {
-      // Ensure the container is in the DOM
-      const qrCodeRegion = document.getElementById(qrcodeRegionId);
-      if (!qrCodeRegion) return;
-
-      const scanner = new Html5Qrcode(qrcodeRegionId, false);
-      html5QrcodeRef.current = scanner;
+      if (!html5QrcodeRef.current) {
+        html5QrcodeRef.current = new Html5Qrcode(qrcodeRegionId, false);
+      }
+      const scanner = html5QrcodeRef.current;
 
       const startScanner = async (cameraId: string) => {
         try {
@@ -68,19 +75,19 @@ export function ScannerDialog({
             cameraId,
             {
               fps: 10,
-              qrbox: (w, h) => ({ width: Math.min(w, h) * 0.8, height: Math.min(w, h) * 0.8 }),
-              aspectRatio: 1.0,
+              qrbox: (w, h) => ({ width: Math.min(w, h) * 0.8, height: Math.min(w, h) * 0.4 }),
+              aspectRatio: 1.7777778, // 16:9
             },
             handleScanSuccess,
-            () => {} // qrCodeErrorCallback
+            () => {} // qrCodeErrorCallback (optional)
           );
           setErrorMessage(null);
         } catch (err: any) {
-          console.error("Error starting scanner:", err);
+           console.error("Error starting scanner:", err);
            if (err.name === 'NotAllowedError') {
             setErrorMessage('Permiso de cámara denegado. Por favor, habilítalo en los ajustes de tu navegador.');
           } else {
-            setErrorMessage(`Error al iniciar el escaner: ${err.message || 'Error desconocido'}`);
+            setErrorMessage(`Error al iniciar el escaner: ${err.message || 'Could not start video source'}`);
           }
         }
       };
@@ -91,9 +98,7 @@ export function ScannerDialog({
           if (devices && devices.length) {
             setCameras(devices);
             const camId = selectedCameraId || (devices.find(d => d.label.toLowerCase().includes('back')) || devices[0]).id;
-            if (!selectedCameraId) {
-              setSelectedCameraId(camId);
-            }
+            setSelectedCameraId(camId);
             await startScanner(camId);
           } else {
             setErrorMessage('No se encontraron cámaras.');
@@ -110,25 +115,14 @@ export function ScannerDialog({
 
       setupScanner();
 
-      stopScannerRef.current = async () => {
-        if (scanner && scanner.isScanning) {
-          try {
-            await scanner.stop();
-          } catch (err) {
-            console.error('Failed to stop the scanner gracefully:', err);
-          }
-        }
-      };
     } else {
-      // When dialog is closed, call the cleanup function
-      stopScannerRef.current?.();
+      stopScanner();
     }
 
-    // Cleanup function on component unmount (or before re-running effect)
     return () => {
-      stopScannerRef.current?.();
+        stopScanner();
     };
-  }, [open, selectedCameraId, handleScanSuccess]);
+  }, [open, selectedCameraId, handleScanSuccess, stopScanner]);
 
 
   return (
@@ -140,7 +134,7 @@ export function ScannerDialog({
           
           <div className="absolute inset-0 pointer-events-none">
               <div className="w-full h-full flex items-center justify-center">
-                  <div className="w-[80vw] max-w-[400px] aspect-square relative">
+                  <div className="w-[80vw] max-w-[400px] h-[40vw] max-h-[200px] relative">
                       <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-primary rounded-tl-xl"></div>
                       <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-primary rounded-tr-xl"></div>
                       <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-primary rounded-bl-xl"></div>
@@ -197,9 +191,9 @@ export function ScannerDialog({
                 object-fit: cover;
             }
             @keyframes scan-line-animation {
-                0% { transform: translateY(-140px); }
-                50% { transform: translateY(140px); }
-                100% { transform: translateY(-140px); }
+                0% { transform: translateY(-10vh); }
+                50% { transform: translateY(10vh); }
+                100% { transform: translateY(-10vh); }
             }
             .animate-scan-line {
                 animation: scan-line-animation 2.5s infinite ease-in-out;

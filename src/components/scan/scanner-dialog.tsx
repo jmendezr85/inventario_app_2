@@ -71,7 +71,6 @@ export function ScannerDialog({
   }, []);
 
   useEffect(() => {
-    if (open) {
       const startScanner = async () => {
         if (status !== 'stopped') return;
 
@@ -128,8 +127,12 @@ export function ScannerDialog({
         }
       };
 
-      startScanner();
-      
+    if (open) {
+      // Use a small timeout to ensure the dialog DOM is ready
+      const timer = setTimeout(() => {
+        startScanner();
+      }, 100);
+      return () => clearTimeout(timer);
     } else {
         stopScanner();
     }
@@ -137,7 +140,7 @@ export function ScannerDialog({
     return () => {
         stopScanner();
     };
-  }, [open, selectedCameraId]); // Re-run effect if camera selection changes
+  }, [open, selectedCameraId, handleScanSuccess, stopScanner, status]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

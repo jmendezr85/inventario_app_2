@@ -61,43 +61,43 @@ export function ScannerDialog({
     setTimeout(() => {
       setShowSuccessRing(false);
       isHandlingSuccessRef.current = false;
-    }, 300); // A short delay is enough for feedback
+    }, 300);
   }, [onScanSuccess]);
 
-  // Stable function to stop the scanner cleanly
   const stopScanner = useCallback(async () => {
     if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning) {
-      setStatus('stopped');
-      try {
-        // The `stop()` method returns a Promise that resolves when the camera is released.
-        await html5QrcodeRef.current.stop();
-      } catch (err) {
-        console.error('Failed to stop the scanner gracefully:', err);
-      }
+        setStatus('stopped');
+        try {
+            await html5QrcodeRef.current.stop();
+            html5QrcodeRef.current.clear();
+            html5QrcodeRef.current = null;
+        } catch (err) {
+            console.error('Failed to stop the scanner gracefully:', err);
+        }
     }
   }, []);
 
   useEffect(() => {
     const startScanner = async () => {
-      // Prevent starting if not open or if already scanning/starting
       if (!open || status !== 'stopped') return;
 
       setStatus('starting');
       setErrorMessage(null);
-
-      // Use a small delay to ensure the dialog and its elements are fully rendered in the DOM
+      
       await new Promise(resolve => setTimeout(resolve, 150));
-
+      
       const scannerContainer = document.getElementById(SCANNER_ELEMENT_ID);
       if (!scannerContainer) {
-        setErrorMessage('Error interno: No se pudo encontrar el visor del escáner.');
-        setStatus('error');
-        return;
+          console.error(`HTML Element with id=${SCANNER_ELEMENT_ID} not found`);
+          setStatus('error');
+          setErrorMessage(`Error interno: No se encontró el visor del escáner.`);
+          return;
       }
       
-      // Initialize the scanner for each session
-      const scanner = new Html5Qrcode(SCANNER_ELEMENT_ID, false);
-      html5QrcodeRef.current = scanner;
+      if (!html5QrcodeRef.current) {
+        html5QrcodeRef.current = new Html5Qrcode(SCANNER_ELEMENT_ID, false);
+      }
+      const scanner = html5QrcodeRef.current;
 
       try {
         const devices = await Html5Qrcode.getCameras();
@@ -105,7 +105,6 @@ export function ScannerDialog({
           setCameras(devices);
           
           let camId = selectedCameraId;
-          // If no camera is pre-selected, try to find the back camera
           if (!camId) {
             const backCam = devices.find(d => d.label.toLowerCase().includes('back'));
             camId = (backCam || devices[0]).id;
@@ -115,25 +114,25 @@ export function ScannerDialog({
           await scanner.start(
             camId,
             {
-              fps: 15, // Increased FPS for smoother video
+              fps: 15,
               qrbox: (w, h) => ({ width: Math.min(w, h) * 0.85, height: Math.min(w, h) * 0.4 }),
-              aspectRatio: 1.7777778, // 16:9
+              aspectRatio: 1.7777778,
             },
             handleScanSuccess,
-            () => {} // Error callback (optional, we handle start errors in catch)
+            () => {}
           );
           setStatus('scanning');
         } else {
           throw new Error('No se encontraron cámaras en este dispositivo.');
         }
       } catch (err: any) {
-         let message = `Error al iniciar el escaner: ${err.name} - ${err.message}`;
+         console.error("Error starting scanner:", err);
+         let message = `Error al iniciar el escaner: ${err.message || 'Could not start video source'}`;
          if (err.name === 'NotAllowedError') {
               message = 'Permiso de cámara denegado. Por favor, habilítalo en los ajustes de tu navegador.';
          }
          setErrorMessage(message);
          setStatus('error');
-         // Attempt to clean up if starting failed
          await stopScanner();
       }
     };
@@ -142,9 +141,8 @@ export function ScannerDialog({
       startScanner();
     }
 
-    // Cleanup function: This is critical. It runs when the component unmounts or `open` becomes false.
     return () => {
-      stopScanner();
+        stopScanner();
     };
   }, [open, selectedCameraId, handleScanSuccess, stopScanner]);
 
@@ -155,7 +153,6 @@ export function ScannerDialog({
         <div className="relative w-full flex-1">
           <div id={SCANNER_ELEMENT_ID} className="w-full h-full" />
           
-          {/* Visual overlay and guides */}
           <div className={cn(
               "absolute inset-0 pointer-events-none transition-all duration-300",
               showSuccessRing && "shadow-[inset_0_0_0_8px_theme(colors.green.500)]"

@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Html5Qrcode, type CameraDevice } from 'html5-qrcode';
 import { Button } from '../ui/button';
-import { Video, X, CheckCircle, Loader2 } from 'lucide-react';
+import { Video, X, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import {
   Select,
@@ -38,135 +38,130 @@ export function ScannerDialog({
   const [selectedCameraId, setSelectedCameraId] = useState<string | undefined>();
   const [status, setStatus] = useState<ScanningStatus>('stopped');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+  
+  // Ref to prevent multiple scans from being processed simultaneously
   const isHandlingSuccessRef = useRef(false);
+  const [showSuccessRing, setShowSuccessRing] = useState(false);
 
-  // This function is now stable and won't change on re-renders
   const handleScanSuccess = useCallback((decodedText: string) => {
+    // Prevent processing a new scan while one is already being handled
     if (isHandlingSuccessRef.current) return;
-    isHandlingSuccessRef.current = true;
     
+    isHandlingSuccessRef.current = true;
     onScanSuccess(decodedText);
-    setShowSuccessOverlay(true);
 
     if (navigator.vibrate) {
       navigator.vibrate(100);
     }
 
+    // Flash a success ring for visual feedback without stopping the scan
+    setShowSuccessRing(true);
+
+    // After a short delay, reset the refs to allow the next scan
     setTimeout(() => {
-      setShowSuccessOverlay(false);
+      setShowSuccessRing(false);
       isHandlingSuccessRef.current = false;
-    }, 500);
+    }, 300); // A short delay is enough for feedback
   }, [onScanSuccess]);
 
-  // This function is now stable and won't change on re-renders
+  // Stable function to stop the scanner cleanly
   const stopScanner = useCallback(async () => {
     if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning) {
-        setStatus('stopped');
-        try {
-            await html5QrcodeRef.current.stop();
-        } catch (err) {
-            console.error('Failed to stop the scanner gracefully:', err);
-        }
+      setStatus('stopped');
+      try {
+        // The `stop()` method returns a Promise that resolves when the camera is released.
+        await html5QrcodeRef.current.stop();
+      } catch (err) {
+        console.error('Failed to stop the scanner gracefully:', err);
+      }
     }
   }, []);
 
   useEffect(() => {
-    // We create a single function to handle starting the scanner
     const startScanner = async () => {
-        // Prevent starting if not in the right state or if a scanner is already active
-        if (status !== 'stopped' || !open) return;
+      // Prevent starting if not open or if already scanning/starting
+      if (!open || status !== 'stopped') return;
 
-        setStatus('starting');
-        setErrorMessage(null);
+      setStatus('starting');
+      setErrorMessage(null);
 
-        // Ensure the container element is in the DOM before initializing.
-        // This check is crucial for preventing race conditions.
-        const scannerContainer = document.getElementById(SCANNER_ELEMENT_ID);
-        if (!scannerContainer) {
-            console.error(`HTML Element with id=${SCANNER_ELEMENT_ID} not found`);
-            setStatus('error');
-            setErrorMessage(`Error interno: No se encontró el visor del escáner.`);
-            return;
+      // Use a small delay to ensure the dialog and its elements are fully rendered in the DOM
+      await new Promise(resolve => setTimeout(resolve, 150));
+
+      const scannerContainer = document.getElementById(SCANNER_ELEMENT_ID);
+      if (!scannerContainer) {
+        setErrorMessage('Error interno: No se pudo encontrar el visor del escáner.');
+        setStatus('error');
+        return;
+      }
+      
+      // Initialize the scanner for each session
+      const scanner = new Html5Qrcode(SCANNER_ELEMENT_ID, false);
+      html5QrcodeRef.current = scanner;
+
+      try {
+        const devices = await Html5Qrcode.getCameras();
+        if (devices && devices.length) {
+          setCameras(devices);
+          
+          let camId = selectedCameraId;
+          // If no camera is pre-selected, try to find the back camera
+          if (!camId) {
+            const backCam = devices.find(d => d.label.toLowerCase().includes('back'));
+            camId = (backCam || devices[0]).id;
+            setSelectedCameraId(camId);
+          }
+
+          await scanner.start(
+            camId,
+            {
+              fps: 15, // Increased FPS for smoother video
+              qrbox: (w, h) => ({ width: Math.min(w, h) * 0.85, height: Math.min(w, h) * 0.4 }),
+              aspectRatio: 1.7777778, // 16:9
+            },
+            handleScanSuccess,
+            () => {} // Error callback (optional, we handle start errors in catch)
+          );
+          setStatus('scanning');
+        } else {
+          throw new Error('No se encontraron cámaras en este dispositivo.');
         }
-
-        // Initialize the scanner library
-        const scanner = new Html5Qrcode(SCANNER_ELEMENT_ID, false);
-        html5QrcodeRef.current = scanner;
-
-        try {
-            const devices = await Html5Qrcode.getCameras();
-            if (devices && devices.length) {
-                setCameras(devices);
-                
-                let camId = selectedCameraId;
-                if (!camId) {
-                    // Prefer the back camera on mobile devices
-                    const backCam = devices.find(d => d.label.toLowerCase().includes('back'));
-                    camId = (backCam || devices[0]).id;
-                    setSelectedCameraId(camId);
-                }
-
-                await scanner.start(
-                    camId,
-                    {
-                        fps: 10,
-                        qrbox: (w, h) => ({ width: Math.min(w, h) * 0.8, height: Math.min(w, h) * 0.4 }),
-                        aspectRatio: 1.7777778,
-                    },
-                    handleScanSuccess,
-                    () => {} // qrCodeErrorCallback - optional
-                );
-                setStatus('scanning');
-            } else {
-                throw new Error('No se encontraron cámaras en este dispositivo.');
-            }
-        } catch (err: any) {
-           console.error("Error starting scanner:", err);
-           let message = `Error al iniciar el escaner: ${err.message || 'Could not start video source'}`;
-           if (err.name === 'NotAllowedError') {
-                message = 'Permiso de cámara denegado. Por favor, habilítalo en los ajustes de tu navegador.';
-           }
-           setErrorMessage(message);
-           setStatus('error');
-           // Ensure cleanup happens even on error
-           await stopScanner();
-        }
+      } catch (err: any) {
+         let message = `Error al iniciar el escaner: ${err.name} - ${err.message}`;
+         if (err.name === 'NotAllowedError') {
+              message = 'Permiso de cámara denegado. Por favor, habilítalo en los ajustes de tu navegador.';
+         }
+         setErrorMessage(message);
+         setStatus('error');
+         // Attempt to clean up if starting failed
+         await stopScanner();
+      }
     };
 
     if (open) {
-        // Use a small timeout to ensure the dialog's DOM is fully rendered before starting the scanner.
-        // This is a robust way to avoid the "Element not found" error.
-        const timer = setTimeout(() => {
-            startScanner();
-        }, 150);
-        return () => clearTimeout(timer);
-    } else {
-        // When the dialog is closed, ensure the scanner is stopped.
-        stopScanner();
+      startScanner();
     }
 
-    // The cleanup function for the useEffect hook ensures that when the component
-    // unmounts or `open` changes, the scanner is stopped cleanly.
+    // Cleanup function: This is critical. It runs when the component unmounts or `open` becomes false.
     return () => {
-        stopScanner();
+      stopScanner();
     };
-    // Dependencies are stable, preventing unnecessary re-runs
-  }, [open, selectedCameraId, handleScanSuccess, stopScanner, status]);
+  }, [open, selectedCameraId, handleScanSuccess, stopScanner]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-full h-full w-full p-0 m-0 flex flex-col bg-black border-0">
         <DialogTitle className="sr-only">Escáner de código de barras</DialogTitle>
         <div className="relative w-full flex-1">
-          {/* This DIV is the target for the scanner video feed */}
           <div id={SCANNER_ELEMENT_ID} className="w-full h-full" />
           
-          {/* Visual overlay for the scanning area */}
-          <div className="absolute inset-0 pointer-events-none">
+          {/* Visual overlay and guides */}
+          <div className={cn(
+              "absolute inset-0 pointer-events-none transition-all duration-300",
+              showSuccessRing && "shadow-[inset_0_0_0_8px_theme(colors.green.500)]"
+          )}>
               <div className="w-full h-full flex items-center justify-center">
-                  <div className="w-[80vw] max-w-[400px] h-[40vw] max-h-[200px] relative">
+                  <div className="w-[85vw] max-w-[500px] h-[40vw] max-h-[250px] relative">
                       <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-primary rounded-tl-xl"></div>
                       <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-primary rounded-tr-xl"></div>
                       <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-primary rounded-bl-xl"></div>
@@ -176,7 +171,6 @@ export function ScannerDialog({
               </div>
           </div>
 
-          {/* Loading indicator */}
           {status === 'starting' && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 text-white">
                 <Loader2 className="h-12 w-12 animate-spin mb-4" />
@@ -184,15 +178,6 @@ export function ScannerDialog({
             </div>
           )}
           
-          {/* Success indicator */}
-          <div className={cn(
-              "absolute inset-0 flex items-center justify-center bg-green-500/20 transition-opacity duration-300 pointer-events-none",
-              showSuccessOverlay ? "opacity-100" : "opacity-0"
-          )}>
-              <CheckCircle className="h-32 w-32 text-white drop-shadow-lg" />
-          </div>
-
-          {/* Close Button */}
           <Button
             onClick={() => onOpenChange(false)}
             variant="ghost"
@@ -203,7 +188,6 @@ export function ScannerDialog({
           </Button>
         </div>
 
-        {/* Controls and Error Display */}
         {(status === 'error' || (status !== 'starting' && cameras.length > 1)) && (
             <div className="absolute bottom-0 left-0 right-0 p-4 bg-black/70 backdrop-blur-sm space-y-2 z-10 rounded-t-lg">
             {status === 'error' && errorMessage && (
@@ -228,20 +212,14 @@ export function ScannerDialog({
             </div>
         )}
         <style jsx>{`
-            div#${SCANNER_ELEMENT_ID} {
-                width: 100%;
-                height: 100%;
-                overflow: hidden;
-            }
             div#${SCANNER_ELEMENT_ID} video {
                 width: 100% !important;
                 height: 100% !important;
                 object-fit: cover;
             }
             @keyframes scan-line-animation {
-                0% { transform: translateY(-10vh); }
-                50% { transform: translateY(10vh); }
-                100% { transform: translateY(-10vh); }
+                0% { transform: translateY(-20vh); }
+                100% { transform: translateY(20vh); }
             }
             .animate-scan-line {
                 animation: scan-line-animation 2.5s infinite ease-in-out;

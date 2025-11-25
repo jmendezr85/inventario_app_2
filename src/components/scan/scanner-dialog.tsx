@@ -37,121 +37,100 @@ export function ScannerDialog({
   const [cameras, setCameras] = useState<CameraDevice[]>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string | undefined>();
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
-  
   const isHandlingSuccessRef = useRef(false);
-
-  const stopScanner = useCallback(async () => {
-    if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning) {
-      try {
-        await html5QrcodeRef.current.stop();
-      } catch (err) {
-        console.error("Scanner stop failed, but proceeding.", err);
-      }
-    }
-  }, []);
+  const stopScannerRef = useRef<() => void>(() => {});
 
   const handleScanSuccess = useCallback((decodedText: string) => {
-      // Prevent multiple rapid scans of the same code
-      if (isHandlingSuccessRef.current) return;
+    if (isHandlingSuccessRef.current) return;
+    isHandlingSuccessRef.current = true;
+    
+    onScanSuccess(decodedText);
+    setShowSuccessOverlay(true);
 
-      isHandlingSuccessRef.current = true;
-      onScanSuccess(decodedText);
-      setShowSuccessOverlay(true);
-
-      // Reset overlay and allow new scans after a short delay
-      setTimeout(() => {
-          setShowSuccessOverlay(false);
-          isHandlingSuccessRef.current = false;
-      }, 500); 
+    setTimeout(() => {
+      setShowSuccessOverlay(false);
+      isHandlingSuccessRef.current = false;
+    }, 500);
   }, [onScanSuccess]);
 
   useEffect(() => {
-    if (!open) {
-      stopScanner();
-      return;
-    }
+    if (open) {
+      const qrcodeElement = document.getElementById(qrcodeRegionId);
+      if (!qrcodeElement) return;
 
-    const container = document.getElementById(qrcodeRegionId);
-    if (!container) return;
+      const scanner = new Html5Qrcode(qrcodeRegionId, false);
+      html5QrcodeRef.current = scanner;
+      let isMounted = true;
 
-    if (!html5QrcodeRef.current) {
-        html5QrcodeRef.current = new Html5Qrcode(qrcodeRegionId, false);
-    }
-    const scanner = html5QrcodeRef.current;
-    
-    let isMounted = true;
-
-    const startScannerWithCameraId = async (cameraId: string) => {
-      if (!isMounted || !scanner || scanner.isScanning) {
-        return;
-      }
-      
-      try {
-        setErrorMessage(null);
-        await scanner.start(
-          cameraId,
-          {
-            fps: 10,
-            qrbox: (viewfinderWidth, viewfinderHeight) => {
-                const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                const qrboxSize = Math.floor(minEdge * 0.85);
-                return { width: qrboxSize, height: qrboxSize };
-            },
-            aspectRatio: 1.0,
-          },
-          handleScanSuccess,
-          (error) => { /* Verbose scan errors, ignored for better UX */ }
-        );
-      } catch (err: any) {
-        if (!isMounted) return;
-        if (err.name === 'NotAllowedError') {
-            setErrorMessage('Permiso de cámara denegado. Por favor, habilítalo en los ajustes de tu navegador.');
-        } else {
-            setErrorMessage(`Error al iniciar el escaner: ${err.name || 'Error desconocido'}`);
-        }
-      }
-    };
-    
-    const setupScanner = async () => {
+      const startScanner = async (cameraId: string) => {
+        if (!isMounted || !scanner || scanner.isScanning) return;
         try {
-            const devices = await Html5Qrcode.getCameras();
-            if (!isMounted) return;
-
-            if (devices && devices.length) {
-                setCameras(devices);
-                const currentCameraId = selectedCameraId;
-                if (!currentCameraId) {
-                    // Prefer back camera by default
-                    const backCamera = devices.find(d => d.label.toLowerCase().includes('back')) || devices[0];
-                    setSelectedCameraId(backCamera.id);
-                    await startScannerWithCameraId(backCamera.id);
-                } else {
-                    await startScannerWithCameraId(currentCameraId);
-                }
-            } else {
-                setErrorMessage('No se encontraron cámaras en este dispositivo.');
-            }
+          setErrorMessage(null);
+          await scanner.start(
+            cameraId,
+            {
+              fps: 10,
+              qrbox: (w, h) => ({ width: Math.min(w, h) * 0.8, height: Math.min(w, h) * 0.8 }),
+              aspectRatio: 1.0,
+            },
+            handleScanSuccess,
+            () => {}
+          );
         } catch (err: any) {
-            if (!isMounted) return;
-            if (err.name === 'NotAllowedError') {
-              setErrorMessage('Permiso de cámara denegado. Por favor, habilítalo en los ajustes de tu navegador.');
-            } else {
-               setErrorMessage(`No se pudo acceder a las cámaras: ${err.message}`);
-            }
+          if (!isMounted) return;
+          if (err.name === 'NotAllowedError') {
+            setErrorMessage('Permiso de cámara denegado. Por favor, habilítalo en los ajustes de tu navegador.');
+          } else {
+            setErrorMessage(`Error al iniciar el escaner: ${err.name || 'Error desconocido'}`);
+          }
         }
-    };
+      };
 
-    if (scanner && scanner.isScanning) {
-        stopScanner().then(setupScanner);
+      const setupAndStartScanner = async () => {
+        try {
+          const devices = await Html5Qrcode.getCameras();
+          if (!isMounted) return;
+
+          if (devices && devices.length) {
+            setCameras(devices);
+            const camId = selectedCameraId || (devices.find(d => d.label.toLowerCase().includes('back')) || devices[0]).id;
+            if (!selectedCameraId) {
+                setSelectedCameraId(camId);
+            }
+            startScanner(camId);
+          } else {
+            setErrorMessage('No se encontraron cámaras en este dispositivo.');
+          }
+        } catch (err: any) {
+          if (!isMounted) return;
+          if (err.name === 'NotAllowedError') {
+            setErrorMessage('Permiso de cámara denegado. Por favor, habilítalo en los ajustes de tu navegador.');
+          } else {
+            setErrorMessage(`No se pudo acceder a las cámaras: ${err.message}`);
+          }
+        }
+      };
+
+      setupAndStartScanner();
+
+      stopScannerRef.current = async () => {
+        isMounted = false;
+        if (scanner && scanner.isScanning) {
+          try {
+            await scanner.stop();
+          } catch (err) {
+            console.error("Error al detener el escaner:", err);
+          }
+        }
+      };
     } else {
-        setupScanner();
+      stopScannerRef.current();
     }
-
+    
     return () => {
-      isMounted = false;
-      stopScanner();
-    };
-  }, [open, selectedCameraId, stopScanner, handleScanSuccess]);
+        if(open) stopScannerRef.current();
+    }
+  }, [open, selectedCameraId, handleScanSuccess]);
 
 
   return (
@@ -161,30 +140,24 @@ export function ScannerDialog({
         <div className="relative w-full flex-1">
           <div id={qrcodeRegionId} className="w-full h-full" />
           
-          {/* Visual scanner overlay */}
           <div className="absolute inset-0 pointer-events-none">
               <div className="w-full h-full flex items-center justify-center">
                   <div className="w-[80vw] max-w-[400px] aspect-square relative">
-                      {/* Corner borders */}
-                      <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-primary rounded-tl-xl transition-all duration-300"></div>
-                      <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-primary rounded-tr-xl transition-all duration-300"></div>
-                      <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-primary rounded-bl-xl transition-all duration-300"></div>
-                      <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-primary rounded-br-xl transition-all duration-300"></div>
-
-                      {/* Animated scanning line */}
+                      <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-primary rounded-tl-xl"></div>
+                      <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-primary rounded-tr-xl"></div>
+                      <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-primary rounded-bl-xl"></div>
+                      <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-primary rounded-br-xl"></div>
                       <div className="absolute top-1/2 left-0 w-full h-0.5 bg-red-500/70 shadow-[0_0_10px_0_rgba(255,0,0,0.7)] animate-scan-line"></div>
                   </div>
               </div>
           </div>
           
-          {/* Success overlay */}
           <div className={cn(
               "absolute inset-0 flex items-center justify-center bg-green-500/20 transition-opacity duration-300 pointer-events-none",
               showSuccessOverlay ? "opacity-100" : "opacity-0"
           )}>
               <CheckCircle className="h-32 w-32 text-white drop-shadow-lg" />
           </div>
-
 
           <Button
             onClick={() => onOpenChange(false)}
@@ -205,7 +178,7 @@ export function ScannerDialog({
                     <AlertDescription>{errorMessage}</AlertDescription>
                 </Alert>
             )}
-             {cameras.length > 1 && (
+             {cameras.length > 1 && !errorMessage && (
                 <Select value={selectedCameraId} onValueChange={setSelectedCameraId}>
                     <SelectTrigger className="w-full bg-gray-800 border-gray-700 text-white">
                         <SelectValue placeholder="Seleccionar cámara" />

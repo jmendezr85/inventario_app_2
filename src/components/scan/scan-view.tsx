@@ -27,10 +27,10 @@ export function ScanView() {
     setHydrated(true);
   }, []);
 
-  const handleScan = useCallback((ean: string) => {
-    if (!ean || isHandlingScanRef.current) return;
+  const handleScan = useCallback((decodedText: string) => {
+    if (!decodedText || isHandlingSuccessRef.current) return;
     
-    isHandlingScanRef.current = true;
+    isHandlingSuccessRef.current = true;
 
     if (!activeStore) {
       toast({
@@ -38,24 +38,24 @@ export function ScanView() {
         title: 'Error',
         description: 'Por favor, selecciona un almacén primero.',
       });
-      isHandlingScanRef.current = false;
+      isHandlingSuccessRef.current = false;
       return;
     }
     
-    const product = masterProducts.find((p) => p.ean === ean);
+    const product = masterProducts.find((p) => p.ean === decodedText);
     
     if (!product) {
       toast({
         variant: 'destructive',
         title: 'Producto Desconocido',
-        description: `El EAN "${ean}" no se encontró en la base de datos.`,
+        description: `El EAN "${decodedText}" no se encontró en la base de datos.`,
       });
-      setTimeout(() => { isHandlingScanRef.current = false; }, 500);
+       setTimeout(() => { isHandlingSuccessRef.current = false; }, 300);
       return;
     }
 
     startTransition(() => {
-      const newScan = scanItem(ean, location);
+      const newScan = scanItem(decodedText, location);
       if (newScan) {
         setHighlightedScanId(newScan.id);
         const timer = setTimeout(() => setHighlightedScanId(null), 1000);
@@ -64,7 +64,7 @@ export function ScanView() {
     });
     
     setManualEan(''); // Clear manual input after scan
-    setTimeout(() => { isHandlingScanRef.current = false; }, 500);
+    setTimeout(() => { isHandlingSuccessRef.current = false; }, 300);
   }, [activeStore, location, scanItem, toast, masterProducts]);
   
   const handleManualSubmit = (e: React.FormEvent) => {
@@ -91,6 +91,8 @@ export function ScanView() {
       </div>
     );
   }
+  
+  const isHandlingSuccessRef = useRef(false);
 
   return (
     <div className="p-4 space-y-4">

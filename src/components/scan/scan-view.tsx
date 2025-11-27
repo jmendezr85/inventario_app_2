@@ -100,30 +100,46 @@ export function ScanView() {
             <label className="text-sm font-medium">Ubicación</label>
             <div className="grid grid-cols-2 gap-2 mt-1">
               <Button
-                variant={location === 'Bodega' ? 'default' : 'outline'}
                 onClick={() => setLocation('Bodega')}
-                className="h-16 text-lg"
+                className={cn(
+                  'h-16 text-lg',
+                  location === 'Bodega'
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'bg-white text-gray-800 border border-gray-300'
+                )}
               >
                 <Warehouse className="mr-2 h-6 w-6" /> Bodega
               </Button>
               <Button
-                variant={location === 'Mueble' ? 'default' : 'outline'}
                 onClick={() => setLocation('Mueble')}
-                className="h-16 text-lg"
+                className={cn(
+                  'h-16 text-lg',
+                   location === 'Mueble'
+                    ? 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                    : 'bg-white text-gray-800 border border-gray-300'
+                )}
               >
                 <Boxes className="mr-2 h-6 w-6" /> Mueble
               </Button>
               <Button
-                variant={location === 'Averias' ? 'default' : 'outline'}
                 onClick={() => setLocation('Averias')}
-                className="h-16 text-lg"
+                className={cn(
+                  'h-16 text-lg',
+                  location === 'Averias'
+                    ? 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
+                    : 'bg-white text-gray-800 border border-gray-300'
+                )}
               >
                 <ShieldX className="mr-2 h-6 w-6" /> Averías
               </Button>
               <Button
-                variant={location === 'Inactivo' ? 'default' : 'outline'}
                 onClick={() => setLocation('Inactivo')}
-                className="h-16 text-lg"
+                className={cn(
+                  'h-16 text-lg',
+                  location === 'Inactivo'
+                    ? 'bg-slate-500 hover:bg-slate-600 text-white'
+                    : 'bg-white text-gray-800 border border-gray-300'
+                )}
               >
                 <Ban className="mr-2 h-6 w-6" /> Inactivo
               </Button>

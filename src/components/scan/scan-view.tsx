@@ -99,13 +99,13 @@ export function ScanView() {
           <div>
             <label className="text-sm font-medium">Ubicación</label>
             <div className="grid grid-cols-2 gap-2 mt-1">
-              <Button
+               <Button
                 onClick={() => setLocation('Bodega')}
                 className={cn(
-                  'h-16 text-lg',
+                  'h-16 text-lg border',
                   location === 'Bodega'
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                    : 'bg-white text-gray-800 border border-gray-300'
+                    ? 'bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200'
+                    : 'bg-white text-gray-800 border-gray-300'
                 )}
               >
                 <Warehouse className="mr-2 h-6 w-6" /> Bodega
@@ -113,10 +113,10 @@ export function ScanView() {
               <Button
                 onClick={() => setLocation('Mueble')}
                 className={cn(
-                  'h-16 text-lg',
+                  'h-16 text-lg border',
                    location === 'Mueble'
-                    ? 'bg-primary hover:bg-primary/90 text-primary-foreground'
-                    : 'bg-white text-gray-800 border border-gray-300'
+                    ? 'bg-green-100 text-green-800 border-green-300 hover:bg-green-200'
+                    : 'bg-white text-gray-800 border-gray-300'
                 )}
               >
                 <Boxes className="mr-2 h-6 w-6" /> Mueble
@@ -124,10 +124,10 @@ export function ScanView() {
               <Button
                 onClick={() => setLocation('Averias')}
                 className={cn(
-                  'h-16 text-lg',
+                  'h-16 text-lg border',
                   location === 'Averias'
-                    ? 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
-                    : 'bg-white text-gray-800 border border-gray-300'
+                    ? 'bg-red-100 text-red-800 border-red-300 hover:bg-red-200'
+                    : 'bg-white text-gray-800 border-gray-300'
                 )}
               >
                 <ShieldX className="mr-2 h-6 w-6" /> Averías
@@ -135,10 +135,10 @@ export function ScanView() {
               <Button
                 onClick={() => setLocation('Inactivo')}
                 className={cn(
-                  'h-16 text-lg',
+                  'h-16 text-lg border',
                   location === 'Inactivo'
-                    ? 'bg-slate-500 hover:bg-slate-600 text-white'
-                    : 'bg-white text-gray-800 border border-gray-300'
+                    ? 'bg-yellow-100 text-yellow-800 border-yellow-300 hover:bg-yellow-200'
+                    : 'bg-white text-gray-800 border-gray-300'
                 )}
               >
                 <Ban className="mr-2 h-6 w-6" /> Inactivo

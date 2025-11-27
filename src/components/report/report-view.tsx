@@ -146,44 +146,44 @@ export function ReportView() {
   return (
     <div className="p-4 space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <Card>
+          <Card className="bg-blue-100 text-blue-800">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Bodega</CardTitle>
-                  <Warehouse className="h-4 w-4 text-muted-foreground" />
+                  <Warehouse className="h-4 w-4 text-blue-700" />
               </CardHeader>
               <CardContent>
                   <div className="text-2xl font-bold">{totals.bodega}</div>
-                  <p className="text-xs text-muted-foreground">unidades</p>
+                  <p className="text-xs text-blue-600">unidades</p>
               </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-green-100 text-green-800">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Mueble</CardTitle>
-                  <Boxes className="h-4 w-4 text-muted-foreground" />
+                  <Boxes className="h-4 w-4 text-green-700" />
               </CardHeader>
               <CardContent>
                   <div className="text-2xl font-bold">{totals.mueble}</div>
-                   <p className="text-xs text-muted-foreground">unidades</p>
+                   <p className="text-xs text-green-600">unidades</p>
               </CardContent>
           </Card>
-           <Card>
+           <Card className="bg-red-100 text-red-800">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Averías</CardTitle>
-                  <ShieldX className="h-4 w-4 text-muted-foreground" />
+                  <ShieldX className="h-4 w-4 text-red-700" />
               </CardHeader>
               <CardContent>
                   <div className="text-2xl font-bold">{totals.averias}</div>
-                   <p className="text-xs text-muted-foreground">unidades</p>
+                   <p className="text-xs text-red-600">unidades</p>
               </CardContent>
           </Card>
-           <Card>
+           <Card className="bg-yellow-100 text-yellow-800">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Inactivo</CardTitle>
-                  <Ban className="h-4 w-4 text-muted-foreground" />
+                  <Ban className="h-4 w-4 text-yellow-700" />
               </CardHeader>
               <CardContent>
                   <div className="text-2xl font-bold">{totals.inactivo}</div>
-                   <p className="text-xs text-muted-foreground">unidades</p>
+                   <p className="text-xs text-yellow-600">unidades</p>
               </CardContent>
           </Card>
           <Card className="col-span-2 md:col-span-1">

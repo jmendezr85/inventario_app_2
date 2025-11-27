@@ -72,7 +72,7 @@ export function ScanView() {
     e.preventDefault();
     handleScan(manualEan);
   };
-
+  
   if (!hydrated) {
     return (
         <div className="flex h-full items-center justify-center p-4">
@@ -92,7 +92,7 @@ export function ScanView() {
       </div>
     );
   }
-  
+
   return (
     <div className="p-4 space-y-4">
       <Card>

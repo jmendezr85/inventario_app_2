@@ -20,7 +20,6 @@ export function ScanView() {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
   const [highlightedScanId, setHighlightedScanId] = useState<string | null>(null);
-  const isHandlingScanRef = useRef(false);
   const isHandlingSuccessRef = useRef(false);
   const [hydrated, setHydrated] = useState(false);
 
@@ -72,7 +71,7 @@ export function ScanView() {
     e.preventDefault();
     handleScan(manualEan);
   };
-  
+
   if (!hydrated) {
     return (
         <div className="flex h-full items-center justify-center p-4">
@@ -92,7 +91,7 @@ export function ScanView() {
       </div>
     );
   }
-
+  
   return (
     <div className="p-4 space-y-4">
       <Card>
@@ -107,7 +106,7 @@ export function ScanView() {
                   'h-16 text-lg',
                   location === 'Bodega'
                     ? 'bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200'
-                    : 'bg-background'
+                    : 'bg-background hover:bg-blue-50'
                 )}
               >
                 <Warehouse className="mr-2 h-6 w-6" /> Bodega
@@ -119,7 +118,7 @@ export function ScanView() {
                   'h-16 text-lg',
                    location === 'Mueble'
                     ? 'bg-green-100 text-green-800 border-green-300 hover:bg-green-200'
-                    : 'bg-background'
+                    : 'bg-background hover:bg-green-50'
                 )}
               >
                 <Boxes className="mr-2 h-6 w-6" /> Mueble
@@ -131,7 +130,7 @@ export function ScanView() {
                   'h-16 text-lg',
                   location === 'Averias'
                     ? 'bg-red-100 text-red-800 border-red-300 hover:bg-red-200'
-                    : 'bg-background'
+                    : 'bg-background hover:bg-red-50'
                 )}
               >
                 <ShieldX className="mr-2 h-6 w-6" /> Averías
@@ -143,7 +142,7 @@ export function ScanView() {
                   'h-16 text-lg',
                   location === 'Inactivo'
                     ? 'bg-yellow-100 text-yellow-800 border-yellow-300 hover:bg-yellow-200'
-                    : 'bg-background'
+                    : 'bg-background hover:bg-yellow-50'
                 )}
               >
                 <Ban className="mr-2 h-6 w-6" /> Inactivo

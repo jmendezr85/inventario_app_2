@@ -21,6 +21,7 @@ export function ScanView() {
   const { toast } = useToast();
   const [highlightedScanId, setHighlightedScanId] = useState<string | null>(null);
   const isHandlingScanRef = useRef(false);
+  const isHandlingSuccessRef = useRef(false);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -92,8 +93,6 @@ export function ScanView() {
     );
   }
   
-  const isHandlingSuccessRef = useRef(false);
-
   return (
     <div className="p-4 space-y-4">
       <Card>

@@ -102,44 +102,48 @@ export function ScanView() {
             <div className="grid grid-cols-2 gap-2 mt-1">
                <Button
                 onClick={() => setLocation('Bodega')}
+                variant={location === 'Bodega' ? 'default' : 'outline'}
                 className={cn(
-                  'h-16 text-lg border',
+                  'h-16 text-lg',
                   location === 'Bodega'
                     ? 'bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200'
-                    : 'bg-white text-gray-800 border-gray-300'
+                    : 'bg-background'
                 )}
               >
                 <Warehouse className="mr-2 h-6 w-6" /> Bodega
               </Button>
               <Button
                 onClick={() => setLocation('Mueble')}
+                variant={location === 'Mueble' ? 'default' : 'outline'}
                 className={cn(
-                  'h-16 text-lg border',
+                  'h-16 text-lg',
                    location === 'Mueble'
                     ? 'bg-green-100 text-green-800 border-green-300 hover:bg-green-200'
-                    : 'bg-white text-gray-800 border-gray-300'
+                    : 'bg-background'
                 )}
               >
                 <Boxes className="mr-2 h-6 w-6" /> Mueble
               </Button>
               <Button
                 onClick={() => setLocation('Averias')}
+                variant={location === 'Averias' ? 'default' : 'outline'}
                 className={cn(
-                  'h-16 text-lg border',
+                  'h-16 text-lg',
                   location === 'Averias'
                     ? 'bg-red-100 text-red-800 border-red-300 hover:bg-red-200'
-                    : 'bg-white text-gray-800 border-gray-300'
+                    : 'bg-background'
                 )}
               >
                 <ShieldX className="mr-2 h-6 w-6" /> Averías
               </Button>
               <Button
                 onClick={() => setLocation('Inactivo')}
+                variant={location === 'Inactivo' ? 'default' : 'outline'}
                 className={cn(
-                  'h-16 text-lg border',
+                  'h-16 text-lg',
                   location === 'Inactivo'
                     ? 'bg-yellow-100 text-yellow-800 border-yellow-300 hover:bg-yellow-200'
-                    : 'bg-white text-gray-800 border-gray-300'
+                    : 'bg-background'
                 )}
               >
                 <Ban className="mr-2 h-6 w-6" /> Inactivo

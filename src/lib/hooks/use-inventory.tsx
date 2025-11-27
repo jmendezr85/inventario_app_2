@@ -4,7 +4,6 @@ import {
   createContext,
   useContext,
   useState,
-  useEffect,
   useCallback,
   ReactNode,
 } from 'react';
@@ -18,6 +17,21 @@ import type {
 } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
+type ReportDataItem = {
+  ean: string;
+  mat?: string;
+  marca?: string;
+  familia?: string;
+  subfamilia?: string;
+  description: string;
+  tip?: string;
+  bodega: number;
+  mueble: number;
+  inventario: number;
+  inactivo: number;
+  averias: number;
+};
+
 interface InventoryContextType {
   stores: Store[];
   activeStore: Store | null;
@@ -30,7 +44,7 @@ interface InventoryContextType {
   scanItem: (ean: string, location: Location) => RecentScan | null;
   recentScans: RecentScan[];
   clearRecentScans: () => void;
-  getReportData: () => { ean: string, description: string, bodega: number, mueble: number, total: number }[];
+  getReportData: () => ReportDataItem[];
   updateInventoryItem: (ean: string, location: Location, quantity: number) => void;
   deleteInventoryItem: (ean: string) => void;
 }
@@ -111,7 +125,10 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   };
 
   const loadMasterProducts = (products: Product[]) => {
-    setMasterProducts(products);
+    // When loading new master products, preserve existing inventory counts
+    // but update product details.
+    const productMap = new Map(products.map(p => [p.ean, p]));
+    setMasterProducts(Array.from(productMap.values()));
   };
 
   const addProduct = (product: Product): boolean => {
@@ -162,7 +179,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     
     const newInventory = { ...inventory };
     if (!newInventory[ean]) {
-      newInventory[ean] = { Bodega: 0, Mueble: 0 };
+      newInventory[ean] = { Bodega: 0, Mueble: 0, Averias: 0, Inactivo: 0 };
     }
     newInventory[ean][location] += 1;
     
@@ -197,7 +214,9 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   const updateInventoryItem = (ean: string, location: Location, quantity: number) => {
     const inventory = getInventory();
     const newInventory = { ...inventory };
-    if (!newInventory[ean]) return;
+    if (!newInventory[ean]) {
+      newInventory[ean] = { Bodega: 0, Mueble: 0, Averias: 0, Inactivo: 0 };
+    };
 
     newInventory[ean][location] = quantity;
     setInventory(newInventory);
@@ -210,18 +229,47 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     setInventory(newInventory);
   };
 
-  const getReportData = useCallback(() => {
+  const getReportData = useCallback((): ReportDataItem[] => {
     const inventory = getInventory();
-    return Object.entries(inventory).map(([ean, counts]) => {
+    
+    const allScannedEans = Object.keys(inventory);
+    const allEans = new Set([...masterProducts.map(p => p.ean), ...allScannedEans]);
+
+    const data: ReportDataItem[] = Array.from(allEans).map(ean => {
       const product = masterProducts.find(p => p.ean === ean);
+      const counts = inventory[ean] || { Bodega: 0, Mueble: 0, Averias: 0, Inactivo: 0 };
+      
       return {
-        ean,
-        description: product?.description || 'Desconocido',
+        ean: ean,
+        mat: product?.mat,
+        marca: product?.marca,
+        familia: product?.familia,
+        subfamilia: product?.subfamilia,
+        description: product?.description || 'Producto no encontrado',
+        tip: product?.tip,
         bodega: counts.Bodega,
         mueble: counts.Mueble,
-        total: counts.Bodega + counts.Mueble,
+        inventario: counts.Bodega + counts.Mueble,
+        inactivo: counts.Inactivo,
+        averias: counts.Averias,
       };
-    }).sort((a,b) => b.total - a.total);
+    });
+
+    const brandOrder = ['SMART', 'NAILEN', 'SP PRO'];
+
+    return data.sort((a, b) => {
+      const brandA = a.marca?.toUpperCase() || '';
+      const brandB = b.marca?.toUpperCase() || '';
+      const indexA = brandOrder.indexOf(brandA);
+      const indexB = brandOrder.indexOf(brandB);
+
+      if (indexA !== -1 && indexB !== -1) {
+        return indexA - indexB;
+      }
+      if (indexA !== -1) return -1;
+      if (indexB !== -1) return 1;
+      return brandA.localeCompare(brandB);
+    });
   }, [getInventory, masterProducts]);
 
   const value = {

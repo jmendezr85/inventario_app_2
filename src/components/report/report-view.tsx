@@ -29,18 +29,26 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FileDown, Trash2, Pencil, Search, X, Warehouse, Boxes, Package } from 'lucide-react';
+import { FileDown, Trash2, Pencil, Search, X, Warehouse, Boxes, Package, ShieldX, Ban } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../ui/card';
+import type { Location } from '@/lib/types';
+
 
 export function ReportView() {
   const { activeStore, getReportData, updateInventoryItem, deleteInventoryItem } = useInventory();
   const [searchTerm, setSearchTerm] = useState('');
   const [editingItem, setEditingItem] = useState<any>(null);
-  const [editBodega, setEditBodega] = useState(0);
-  const [editMueble, setEditMueble] = useState(0);
+  const [editCounts, setEditCounts] = useState({
+    Bodega: 0,
+    Mueble: 0,
+    Averias: 0,
+    Inactivo: 0
+  });
+
 
   const reportData = useMemo(() => {
     if (!activeStore) return [];
@@ -52,29 +60,47 @@ export function ReportView() {
         (acc, item) => {
             acc.bodega += item.bodega;
             acc.mueble += item.mueble;
-            acc.total += item.total;
+            acc.inventario += item.inventario;
+            acc.averias += item.averias;
+            acc.inactivo += item.inactivo;
             return acc;
         },
-        { bodega: 0, mueble: 0, total: 0 }
+        { bodega: 0, mueble: 0, inventario: 0, averias: 0, inactivo: 0 }
     );
   }, [reportData]);
 
   const filteredData = useMemo(() => {
+    if (!searchTerm) return reportData;
     return reportData.filter(
       (item) =>
         item.ean.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchTerm.toLowerCase())
+        item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.marca?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [reportData, searchTerm]);
 
   const handleExport = () => {
-    const dataToExport = filteredData.map(item => ({
-        'EAN': item.ean,
-        'DESCRIPCION': item.description,
-        'Cantidad en BODEGA': item.bodega,
-        'Cantidad en MUEBLE': item.mueble,
-        'TOTAL': item.total,
-    }));
+    const dataToExport = filteredData.map(item => {
+        const upperCaseItem: { [key: string]: any } = {};
+        for (const key in item) {
+            const value = (item as any)[key];
+            upperCaseItem[key.toUpperCase()] = typeof value === 'string' ? value.toUpperCase() : value;
+        }
+        return {
+            'EAN': upperCaseItem['EAN'],
+            'MAT': upperCaseItem['MAT'] ?? '',
+            'MARCA': upperCaseItem['MARCA'] ?? '',
+            'FAMILIA': upperCaseItem['FAMILIA'] ?? '',
+            'SUBFAMILIA': upperCaseItem['SUBFAMILIA'] ?? '',
+            'DESCRIPCION': upperCaseItem['DESCRIPCION'] ?? '',
+            'TIP': upperCaseItem['TIP'] ?? '',
+            'BODEGA': upperCaseItem['BODEGA'],
+            'MUEBLE': upperCaseItem['MUEBLE'],
+            'INVENTARIO': upperCaseItem['INVENTARIO'],
+            'INACTIVO': upperCaseItem['INACTIVO'],
+            'AVERIAS': upperCaseItem['AVERIAS'],
+        };
+    });
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Reporte');
@@ -83,17 +109,27 @@ export function ReportView() {
 
   const startEditing = (item: any) => {
     setEditingItem(item);
-    setEditBodega(item.bodega);
-    setEditMueble(item.mueble);
+    setEditCounts({
+        Bodega: item.bodega,
+        Mueble: item.mueble,
+        Averias: item.averias,
+        Inactivo: item.inactivo
+    });
   };
   
   const handleSaveChanges = () => {
     if (editingItem) {
-      updateInventoryItem(editingItem.ean, 'Bodega', editBodega);
-      updateInventoryItem(editingItem.ean, 'Mueble', editMueble);
+      updateInventoryItem(editingItem.ean, 'Bodega', editCounts.Bodega);
+      updateInventoryItem(editingItem.ean, 'Mueble', editCounts.Mueble);
+      updateInventoryItem(editingItem.ean, 'Averias', editCounts.Averias);
+      updateInventoryItem(editingItem.ean, 'Inactivo', editCounts.Inactivo);
       setEditingItem(null);
     }
   };
+
+  const handleEditCountChange = (location: Location, value: string) => {
+    setEditCounts(prev => ({ ...prev, [location]: Math.max(0, parseInt(value) || 0) }));
+  }
 
   if (!activeStore) {
     return (
@@ -109,7 +145,7 @@ export function ReportView() {
 
   return (
     <div className="p-4 space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Bodega</CardTitle>
@@ -130,14 +166,34 @@ export function ReportView() {
                    <p className="text-xs text-muted-foreground">unidades</p>
               </CardContent>
           </Card>
-          <Card>
+           <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total General</CardTitle>
+                  <CardTitle className="text-sm font-medium">Total Averías</CardTitle>
+                  <ShieldX className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                  <div className="text-2xl font-bold">{totals.averias}</div>
+                   <p className="text-xs text-muted-foreground">unidades</p>
+              </CardContent>
+          </Card>
+           <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Inactivo</CardTitle>
+                  <Ban className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                  <div className="text-2xl font-bold">{totals.inactivo}</div>
+                   <p className="text-xs text-muted-foreground">unidades</p>
+              </CardContent>
+          </Card>
+          <Card className="col-span-2 md:col-span-1">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Inventario</CardTitle>
                   <Package className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                  <div className="text-2xl font-bold">{totals.total}</div>
-                   <p className="text-xs text-muted-foreground">unidades</p>
+                  <div className="text-2xl font-bold">{totals.inventario}</div>
+                   <p className="text-xs text-muted-foreground">Bodega + Mueble</p>
               </CardContent>
           </Card>
       </div>
@@ -146,7 +202,7 @@ export function ReportView() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por EAN o descripción..."
+            placeholder="Buscar por EAN, descripción, marca..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -166,21 +222,14 @@ export function ReportView() {
             <Card key={item.ean}>
               <CardHeader className="p-4">
                 <CardTitle className="text-base">{item.description}</CardTitle>
-                <p className="text-xs text-muted-foreground">{item.ean}</p>
+                <p className="text-xs text-muted-foreground">{item.ean} - {item.marca}</p>
               </CardHeader>
-              <CardContent className="p-4 grid grid-cols-3 gap-2 text-center">
-                <div>
-                    <p className="text-xs text-muted-foreground">Bodega</p>
-                    <p className="font-bold">{item.bodega}</p>
-                </div>
-                 <div>
-                    <p className="text-xs text-muted-foreground">Mueble</p>
-                    <p className="font-bold">{item.mueble}</p>
-                </div>
-                 <div>
-                    <p className="text-xs text-muted-foreground">Total</p>
-                    <p className="font-bold">{item.total}</p>
-                </div>
+              <CardContent className="p-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-muted-foreground">Bodega:</span> <span className="font-bold">{item.bodega}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Mueble:</span> <span className="font-bold">{item.mueble}</span></div>
+                <div className="flex justify-between col-span-2 text-base"><span className="text-muted-foreground">Inventario:</span> <span className="font-bold">{item.inventario}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Averías:</span> <span className="font-bold">{item.averias}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Inactivo:</span> <span className="font-bold">{item.inactivo}</span></div>
               </CardContent>
               <CardFooter className="p-2 flex justify-end gap-1">
                 <Button variant="ghost" size="icon" onClick={() => startEditing(item)}>
@@ -196,7 +245,7 @@ export function ReportView() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
                         <AlertDialogDescription>
-                        Esta acción no se puede deshacer. Se eliminará permanentemente el artículo "{item.description}" del inventario.
+                        Esta acción no se puede deshacer. Se eliminará permanentemente el artículo "{item.description}" del inventario de este almacén.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -221,14 +270,16 @@ export function ReportView() {
 
       {/* Desktop View */}
       <Card className="hidden md:block">
-        <ScrollArea className="h-[calc(100vh-25rem)]">
+        <ScrollArea className="h-[calc(100vh-27rem)]">
           <Table>
-            <TableHeader className="sticky top-0 bg-background">
+            <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
                 <TableHead>Descripción</TableHead>
                 <TableHead className="text-center">Bodega</TableHead>
                 <TableHead className="text-center">Mueble</TableHead>
-                <TableHead className="text-center">Total</TableHead>
+                <TableHead className="text-center">Inventario</TableHead>
+                <TableHead className="text-center">Averías</TableHead>
+                <TableHead className="text-center">Inactivo</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -238,11 +289,13 @@ export function ReportView() {
                   <TableRow key={item.ean}>
                     <TableCell>
                       <div className="font-medium">{item.description}</div>
-                      <div className="text-xs text-muted-foreground">{item.ean}</div>
+                      <div className="text-xs text-muted-foreground">{item.ean} - {item.marca}</div>
                     </TableCell>
                     <TableCell className="text-center">{item.bodega}</TableCell>
                     <TableCell className="text-center">{item.mueble}</TableCell>
-                    <TableCell className="text-center font-bold">{item.total}</TableCell>
+                    <TableCell className="text-center font-bold">{item.inventario}</TableCell>
+                    <TableCell className="text-center">{item.averias}</TableCell>
+                    <TableCell className="text-center">{item.inactivo}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => startEditing(item)}>
                         <Pencil className="h-4 w-4" />
@@ -257,7 +310,7 @@ export function ReportView() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Esta acción no se puede deshacer. Se eliminará permanentemente el artículo "{item.description}" del inventario.
+                                Esta acción no se puede deshacer. Se eliminará permanentemente el artículo "{item.description}" del inventario de este almacén.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -273,7 +326,7 @@ export function ReportView() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
+                  <TableCell colSpan={7} className="h-24 text-center">
                     No se encontraron resultados.
                   </TableCell>
                 </TableRow>
@@ -287,16 +340,25 @@ export function ReportView() {
         <Dialog open={!!editingItem} onOpenChange={() => setEditingItem(null)}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Editar Cantidades: {editingItem.description}</DialogTitle>
+                    <DialogTitle>Editar Cantidades</DialogTitle>
+                    <DialogDescription>{editingItem.description}</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     <div className="flex items-center gap-4">
-                        <label htmlFor="bodega-qty" className="w-20">Bodega</label>
-                        <Input id="bodega-qty" type="number" value={editBodega} onChange={e => setEditBodega(Math.max(0, parseInt(e.target.value) || 0))} />
+                        <label htmlFor="bodega-qty" className="w-24 text-right">Bodega</label>
+                        <Input id="bodega-qty" type="number" value={editCounts.Bodega} onChange={e => handleEditCountChange('Bodega', e.target.value)} />
                     </div>
                      <div className="flex items-center gap-4">
-                        <label htmlFor="mueble-qty" className="w-20">Mueble</label>
-                        <Input id="mueble-qty" type="number" value={editMueble} onChange={e => setEditMueble(Math.max(0, parseInt(e.target.value) || 0))} />
+                        <label htmlFor="mueble-qty" className="w-24 text-right">Mueble</label>
+                        <Input id="mueble-qty" type="number" value={editCounts.Mueble} onChange={e => handleEditCountChange('Mueble', e.target.value)} />
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <label htmlFor="averias-qty" className="w-24 text-right">Averías</label>
+                        <Input id="averias-qty" type="number" value={editCounts.Averias} onChange={e => handleEditCountChange('Averias', e.target.value)} />
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <label htmlFor="inactivo-qty" className="w-24 text-right">Inactivo</label>
+                        <Input id="inactivo-qty" type="number" value={editCounts.Inactivo} onChange={e => handleEditCountChange('Inactivo', e.target.value)} />
                     </div>
                 </div>
                 <DialogFooter>

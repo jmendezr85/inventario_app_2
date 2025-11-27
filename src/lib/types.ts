@@ -6,10 +6,15 @@ export interface Store {
 
 export interface Product {
   ean: string;
+  mat?: string;
+  marca?: string;
+  familia?: string;
+  subfamilia?: string;
   description: string;
+  tip?: string;
 }
 
-export type Location = 'Bodega' | 'Mueble';
+export type Location = 'Bodega' | 'Mueble' | 'Averias' | 'Inactivo';
 
 export interface InventoryItem {
   ean: string;
@@ -26,5 +31,7 @@ export interface InventoryState {
   [ean: string]: {
     Bodega: number;
     Mueble: number;
+    Averias: number;
+    Inactivo: number;
   };
 }

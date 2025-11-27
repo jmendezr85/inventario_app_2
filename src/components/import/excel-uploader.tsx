@@ -27,28 +27,47 @@ export function ExcelUploader({ onDataLoaded }: ExcelUploaderProps) {
           const workbook = XLSX.read(data, { type: 'array' });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
-          const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+          const json = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: null }) as (string | null)[][];
 
           if (json.length === 0) {
             throw new Error('El archivo Excel está vacío.');
           }
           
-          const header = json[0].map(h => String(h).toUpperCase());
-          const eanIndex = header.findIndex(h => h.includes('EAN'));
-          const descIndex = header.findIndex(h => h.includes('DESCRIPCION'));
+          const header = json[0].map(h => String(h || '').toUpperCase().trim());
+          
+          const findIndex = (aliases: string[]) => {
+            for (const alias of aliases) {
+              const index = header.findIndex(h => h.includes(alias.toUpperCase()));
+              if (index !== -1) return index;
+            }
+            return -1;
+          };
+
+          const eanIndex = findIndex(['EAN']);
+          const descIndex = findIndex(['DESCRIPCION']);
+          const matIndex = findIndex(['MAT']);
+          const marcaIndex = findIndex(['MARCA']);
+          const familiaIndex = findIndex(['FAMILIA']);
+          const subfamiliaIndex = findIndex(['SUBFAMILIA']);
+          const tipIndex = findIndex(['TIP']);
 
           if (eanIndex === -1 || descIndex === -1) {
-            throw new Error('El archivo debe contener las columnas "EAN" y "DESCRIPCION".');
+            throw new Error('El archivo debe contener al menos las columnas "EAN" y "DESCRIPCION".');
           }
 
-          const products: Product[] = json.slice(1).map((row, index) => {
-             // Skip empty rows
-            if (!row || row.length === 0 || !row[eanIndex]) {
+          const products: Product[] = json.slice(1).map((row) => {
+            const ean = row[eanIndex] ? String(row[eanIndex]).trim() : null;
+            if (!ean) {
                 return null;
             }
             return {
-              ean: String(row[eanIndex]).trim(),
+              ean: ean,
               description: String(row[descIndex] || 'Sin descripción').trim(),
+              mat: row[matIndex] ? String(row[matIndex]).trim() : undefined,
+              marca: row[marcaIndex] ? String(row[marcaIndex]).trim() : undefined,
+              familia: row[familiaIndex] ? String(row[familiaIndex]).trim() : undefined,
+              subfamilia: row[subfamiliaIndex] ? String(row[subfamiliaIndex]).trim() : undefined,
+              tip: row[tipIndex] ? String(row[tipIndex]).trim() : undefined,
             }
           }).filter((p): p is Product => p !== null);
 

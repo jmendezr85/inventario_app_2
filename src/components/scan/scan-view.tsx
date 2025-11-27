@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useInventory } from '@/lib/hooks/use-inventory';
 import type { Location } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { Camera, Boxes, Warehouse, CheckCircle, AlertCircle, Loader2, Trash2 } from 'lucide-react';
+import { Camera, Boxes, Warehouse, CheckCircle, AlertCircle, Loader2, Trash2, ShieldX, Ban } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ScannerDialog } from './scanner-dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
@@ -112,6 +112,20 @@ export function ScanView() {
                 className="h-16 text-lg"
               >
                 <Boxes className="mr-2 h-6 w-6" /> Mueble
+              </Button>
+              <Button
+                variant={location === 'Averias' ? 'default' : 'outline'}
+                onClick={() => setLocation('Averias')}
+                className="h-16 text-lg"
+              >
+                <ShieldX className="mr-2 h-6 w-6" /> Averías
+              </Button>
+              <Button
+                variant={location === 'Inactivo' ? 'default' : 'outline'}
+                onClick={() => setLocation('Inactivo')}
+                className="h-16 text-lg"
+              >
+                <Ban className="mr-2 h-6 w-6" /> Inactivo
               </Button>
             </div>
           </div>

@@ -20,14 +20,56 @@ export function ScanView() {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
   const [highlightedScanId, setHighlightedScanId] = useState<string | null>(null);
-  const isHandlingSuccessRef = useRef(false);
   const [hydrated, setHydrated] = useState(false);
-
+  
   useEffect(() => {
     setHydrated(true);
   }, []);
 
   const handleScan = useCallback((decodedText: string) => {
+    if (!decodedText) return;
+
+    if (!activeStore) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Por favor, selecciona un almacén primero.',
+      });
+      return;
+    }
+    
+    const product = masterProducts.find((p) => p.ean === decodedText);
+    
+    if (!product) {
+      toast({
+        variant: 'destructive',
+        title: 'Producto Desconocido',
+        description: `El EAN "${decodedText}" no se encontró en la base de datos.`,
+      });
+       return;
+    }
+
+    startTransition(() => {
+      const newScan = scanItem(decodedText, location);
+      if (newScan) {
+        setHighlightedScanId(newScan.id);
+        const timer = setTimeout(() => setHighlightedScanId(null), 1000);
+        return () => clearTimeout(timer);
+      }
+    });
+    
+    setManualEan(''); // Clear manual input after scan
+    setScannerOpen(false); // Close scanner after successful scan
+  }, [activeStore, location, scanItem, toast, masterProducts]);
+  
+  const handleManualSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleScan(manualEan);
+  };
+  
+  const isHandlingSuccessRef = useRef(false);
+
+  const handleContinuousScan = useCallback((decodedText: string) => {
     if (!decodedText || isHandlingSuccessRef.current) return;
     
     isHandlingSuccessRef.current = true;
@@ -66,11 +108,7 @@ export function ScanView() {
     setManualEan(''); // Clear manual input after scan
     setTimeout(() => { isHandlingSuccessRef.current = false; }, 300);
   }, [activeStore, location, scanItem, toast, masterProducts]);
-  
-  const handleManualSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    handleScan(manualEan);
-  };
+
 
   if (!hydrated) {
     return (
@@ -101,48 +139,48 @@ export function ScanView() {
             <div className="grid grid-cols-2 gap-2 mt-1">
                <Button
                 onClick={() => setLocation('Bodega')}
-                variant={location === 'Bodega' ? 'default' : 'outline'}
+                variant={'outline'}
                 className={cn(
                   'h-16 text-lg',
                   location === 'Bodega'
                     ? 'bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200'
-                    : 'bg-background hover:bg-blue-50'
+                    : 'bg-background text-foreground hover:bg-blue-100 hover:text-blue-800'
                 )}
               >
                 <Warehouse className="mr-2 h-6 w-6" /> Bodega
               </Button>
               <Button
                 onClick={() => setLocation('Mueble')}
-                variant={location === 'Mueble' ? 'default' : 'outline'}
+                variant={'outline'}
                 className={cn(
                   'h-16 text-lg',
                    location === 'Mueble'
                     ? 'bg-green-100 text-green-800 border-green-300 hover:bg-green-200'
-                    : 'bg-background hover:bg-green-50'
+                    : 'bg-background text-foreground hover:bg-green-100 hover:text-green-800'
                 )}
               >
                 <Boxes className="mr-2 h-6 w-6" /> Mueble
               </Button>
               <Button
                 onClick={() => setLocation('Averias')}
-                variant={location === 'Averias' ? 'default' : 'outline'}
+                variant={'outline'}
                 className={cn(
                   'h-16 text-lg',
                   location === 'Averias'
                     ? 'bg-red-100 text-red-800 border-red-300 hover:bg-red-200'
-                    : 'bg-background hover:bg-red-50'
+                    : 'bg-background text-foreground hover:bg-red-100 hover:text-red-800'
                 )}
               >
                 <ShieldX className="mr-2 h-6 w-6" /> Averías
               </Button>
               <Button
                 onClick={() => setLocation('Inactivo')}
-                variant={location === 'Inactivo' ? 'default' : 'outline'}
+                variant={'outline'}
                 className={cn(
                   'h-16 text-lg',
                   location === 'Inactivo'
                     ? 'bg-yellow-100 text-yellow-800 border-yellow-300 hover:bg-yellow-200'
-                    : 'bg-background hover:bg-yellow-50'
+                    : 'bg-background text-foreground hover:bg-yellow-100 hover:text-yellow-800'
                 )}
               >
                 <Ban className="mr-2 h-6 w-6" /> Inactivo
@@ -168,7 +206,7 @@ export function ScanView() {
         </CardContent>
       </Card>
       
-      <ScannerDialog open={scannerOpen} onOpenChange={setScannerOpen} onScanSuccess={handleScan} />
+      <ScannerDialog open={scannerOpen} onOpenChange={setScannerOpen} onScanSuccess={handleContinuousScan} />
 
       <div>
         <div className="flex justify-between items-center mb-2">
